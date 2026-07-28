@@ -78,8 +78,10 @@ async def telemetry_background_loop():
             # Execute serial read in thread pool to prevent blocking asyncio loop
             data = await loop.run_in_executor(None, yds_reader_instance.read_telemetry)
 
-            # Calculate real-time fuel consumption if running
-            if data and data.get("status") == "ok":
+            is_mock = cli_args.mock or (yds_reader_instance and yds_reader_instance.mock_mode)
+
+            # Calculate real-time fuel consumption if running (live hardware mode only)
+            if data and data.get("status") == "ok" and not is_mock:
                 fuel_rate_lh = float(data.get("fuel_rate_lh", 0.0))
                 if fuel_rate_lh > 0.0:
                     consumed_delta = (fuel_rate_lh * dt) / 3600.0
@@ -97,8 +99,8 @@ async def telemetry_background_loop():
 
             latest_telemetry = data
 
-            # Log to SQLite database history every 1.0 second
-            if (now - last_db_log_time) >= 1.0:
+            # Log to SQLite database history every 1.0 second (live hardware mode only)
+            if not is_mock and (now - last_db_log_time) >= 1.0:
                 last_db_log_time = now
                 await loop.run_in_executor(None, database.log_telemetry_frame, data)
 

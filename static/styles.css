@@ -663,8 +663,9 @@ body.helm-theme {
     height: 380px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    padding: 12px;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
 }
 
 .capacity-tag {
@@ -679,22 +680,22 @@ body.helm-theme {
 
 .fuel-display-grid {
     display: flex;
-    gap: 16px;
-    height: 220px;
-    margin: 8px 0;
+    gap: 14px;
+    height: 180px;
+    margin: 4px 0;
 }
 
 /* Vertical Fuel Tank Level Gauge Bar */
 .tank-gauge-section {
-    width: 140px;
-    height: 220px;
+    width: 130px;
+    height: 180px;
     display: flex;
     justify-content: center;
 }
 
 .tank-gauge-track-large {
-    width: 60px;
-    height: 220px;
+    width: 54px;
+    height: 180px;
     background: rgba(0, 0, 0, 0.4);
     border: 2px solid rgba(0, 229, 255, 0.3);
     border-radius: 10px;
@@ -785,9 +786,9 @@ body.helm-theme {
 .fuel-controls-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(0, 229, 255, 0.2);
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(0, 229, 255, 0.25);
     border-radius: 8px;
     padding: 8px 12px;
 }
@@ -812,13 +813,13 @@ body.helm-theme {
 
 .fuel-adj-btn {
     font-family: var(--font-heading);
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     font-weight: 900;
-    padding: 8px 16px;
+    padding: 6px 14px;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s ease;
-    min-width: 70px;
+    min-width: 65px;
     border: 1px solid transparent;
 }
 
