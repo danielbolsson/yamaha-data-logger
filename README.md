@@ -2,6 +2,10 @@
 
 A real-time telemetry decoding engine and marine helm web dashboard for **Yamaha Outboard Engines** (calibrated for Yamaha F150 ECU `63P-8591A-01` / `63P-01`) connected via a 12V ISO 9141 K-Line USB diagnostic adapter to a Raspberry Pi or PC.
 
+## Dashboard
+
+![dashboard](images/dashboard.png)
+
 ---
 
 ## 1. Wiring & Hardware Requirements
@@ -13,6 +17,10 @@ A real-time telemetry decoding engine and marine helm web dashboard for **Yamaha
 | **Pin 16** | **Red Wire** | +12V Power | Switched +12V DC from Engine Harness |
 | **Pin 4 / Pin 5** | **Black Wire** | Engine / Battery Ground | Chassis / Battery Negative Ground |
 | **Pin 7 (K-Line)** | **Data Wire** (Yellow/White) | ISO 9141 K-Line Data Signal | ~4V–12V TTL Data Line (Do NOT use Pin 15 L-Line) |
+
+- **Yamaha Outboard Engine:** F150 / F115 / F200 / F225 (ECU `63P-8591A-01` / `63P-01`).
+- **USB K-Line Adapter:** 12V ISO 9141-2 K-Line diagnostic cable (`/dev/ttyUSB0`).
+- **USB GPS / GNSS Receiver:** u-blox 7 USB GNSS Receiver (Vendor ID `1546`, Product ID `01a7`, device `/dev/ttyACM0`).
 
 > [!IMPORTANT]
 > **Ignition Key Requirement:** The boat ignition key switch **MUST BE ON** for the ECU to power up and respond to K-Line requests.

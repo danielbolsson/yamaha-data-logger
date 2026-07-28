@@ -53,6 +53,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const tempToggleBtn = document.getElementById("temp-toggle-btn");
     const headerHours = document.getElementById("header-hours");
 
+    // GPS DOM Elements
+    const gpsBadge = document.getElementById("gps-badge");
+    const gpsDot = document.getElementById("gps-dot");
+    const gpsText = document.getElementById("gps-text");
+    const gpsSpeedVal = document.getElementById("gps-speed-val");
+    const gpsHeadingVal = document.getElementById("gps-heading-val");
+    const fuelEconomyVal = document.getElementById("fuel-economy-val");
+
     const alertBanner = document.getElementById("alert-banner");
     const alertTitle = document.getElementById("alert-title");
     const alertDetail = document.getElementById("alert-detail");
@@ -474,6 +482,12 @@ document.addEventListener("DOMContentLoaded", () => {
             connText.innerText = "OFFLINE";
             pingText.innerText = "--ms";
 
+            if (gpsBadge) {
+                gpsBadge.className = "status-pill disconnected";
+                if (gpsDot) gpsDot.style.backgroundColor = "var(--accent-red)";
+                if (gpsText) gpsText.innerText = "🛰️ OFFLINE";
+            }
+
             digitalRpm.innerText = "--";
             renderRpmGauge(0);
 
@@ -499,6 +513,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (baroVal) baroVal.innerText = "--";
             if (fuelRateVal) fuelRateVal.innerText = "--";
 
+            if (gpsSpeedVal) gpsSpeedVal.innerText = "--";
+            if (gpsHeadingVal) gpsHeadingVal.innerText = "--° N";
+            if (fuelEconomyVal) fuelEconomyVal.innerText = "-- L/NM";
+
             updateFlag(flagOil, false, "OIL --", "LOW OIL");
             updateFlag(flagTemp, false, "TEMP --", "OVERHEAT");
             updateFlag(flagBatt, false, "BATT --", "LOW VOLT");
@@ -514,6 +532,28 @@ document.addEventListener("DOMContentLoaded", () => {
         connBadge.className = "status-pill connected";
         connDot.style.backgroundColor = "var(--accent-green)";
         connText.innerText = "ONLINE";
+
+        // GPS Receiver Status
+        if (data.gps) {
+            const gpsData = data.gps;
+            if (gpsBadge) {
+                if (gpsData.has_fix) {
+                    gpsBadge.className = "status-pill connected";
+                    if (gpsDot) gpsDot.style.backgroundColor = "var(--accent-cyan)";
+                    if (gpsText) gpsText.innerText = `🛰️ ${gpsData.satellites || 0} SATS`;
+                } else {
+                    gpsBadge.className = "status-pill disconnected";
+                    if (gpsDot) gpsDot.style.backgroundColor = "var(--accent-red)";
+                    if (gpsText) gpsText.innerText = "🛰️ NO FIX";
+                }
+            }
+
+            if (gpsSpeedVal) gpsSpeedVal.innerText = (data.gps_speed_kts || 0.0).toFixed(1);
+            if (gpsHeadingVal) gpsHeadingVal.innerText = `${Math.round(data.gps_heading_deg || 0)}° ${data.gps_cardinal || 'N'}`;
+            if (fuelEconomyVal) {
+                fuelEconomyVal.innerText = (data.fuel_economy_l_nm > 0) ? `${data.fuel_economy_l_nm.toFixed(2)} L/NM` : "-- L/NM";
+            }
+        }
 
         // 1. Tachometer & TPS
         const rpm = Math.round(data.rpm || 0);

@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from yds_reader import YDSReader
+from gps_reader import GPSReader
 import database
 
 # Configure Logging
@@ -31,6 +32,7 @@ logger = logging.getLogger("yds_server")
 active_websockets: Set[WebSocket] = set()
 latest_telemetry: dict = {}
 yds_reader_instance: YDSReader = None
+gps_reader_instance: GPSReader = None
 polling_task: asyncio.Task = None
 
 # Fuel Tracking State
@@ -40,13 +42,15 @@ last_db_log_time: float = 0.0
 
 # System Configuration
 DEFAULT_SERIAL_PORT = os.getenv("YDS_PORT", "/dev/ttyUSB0")
+DEFAULT_GPS_PORT = os.getenv("GPS_PORT", "/dev/ttyACM0")
 DEFAULT_BAUD_RATE = int(os.getenv("YDS_BAUD", "9600"))
 DEFAULT_WEB_PORT = int(os.getenv("WEB_PORT", "8000"))
 DEFAULT_MOCK_MODE = os.getenv("YDS_MOCK", "false").lower() in ("true", "1", "yes")
 
 # Command-line Argument Parsing
 parser = argparse.ArgumentParser(description="Yamaha YDS Telemetry Web Server")
-parser.add_argument("--serial-port", default=DEFAULT_SERIAL_PORT, help="Serial device path (default /dev/ttyUSB0)")
+parser.add_argument("--serial-port", default=DEFAULT_SERIAL_PORT, help="YDS Serial device path (default /dev/ttyUSB0)")
+parser.add_argument("--gps-port", default=DEFAULT_GPS_PORT, help="GPS Receiver device path (default /dev/ttyACM0)")
 parser.add_argument("--baud", type=int, default=DEFAULT_BAUD_RATE, help="Serial baud rate (default 9600)")
 parser.add_argument("--host", default="0.0.0.0", help="Web server host IP (default 0.0.0.0)")
 parser.add_argument("--web-port", type=int, default=DEFAULT_WEB_PORT, help="Web server port (default 8000)")
@@ -82,21 +86,36 @@ async def telemetry_background_loop():
 
             is_mock = cli_args.mock or (yds_reader_instance and yds_reader_instance.mock_mode)
 
+            # Read GPS snapshot
+            gps_data = gps_reader_instance.read_gps(engine_rpm=data.get("rpm", 0.0)) if gps_reader_instance else {}
+            speed_kts = gps_data.get("speed_knots", 0.0)
+            fuel_lh = data.get("fuel_rate_lh", 0.0)
+
+            # Calculate Fuel Economy in Liters per Nautical Mile (L/NM)
+            fuel_economy_l_nm = round(fuel_lh / speed_kts, 2) if speed_kts > 0.5 and fuel_lh > 0 else 0.0
+
             # Calculate real-time fuel consumption if running (live hardware mode only)
             if data and data.get("status") == "ok" and not is_mock:
-                fuel_rate_lh = float(data.get("fuel_rate_lh", 0.0))
-                if fuel_rate_lh > 0.0:
-                    consumed_delta = (fuel_rate_lh * dt) / 3600.0
+                if fuel_lh > 0.0:
+                    consumed_delta = (fuel_lh * dt) / 3600.0
                     new_rem = max(0.0, current_fuel_state["current_fuel_liters"] - consumed_delta)
                     new_trip = current_fuel_state["trip_consumed_liters"] + consumed_delta
                     current_fuel_state = database.update_fuel_state(new_rem, trip_consumed=new_trip)
 
-            # Attach fuel state to telemetry packet
+            # Attach fuel state and GPS telemetry to payload
             data.update({
                 "current_fuel_liters": current_fuel_state["current_fuel_liters"],
                 "tank_capacity_liters": current_fuel_state["tank_capacity_liters"],
                 "trip_consumed_liters": current_fuel_state["trip_consumed_liters"],
-                "fuel_percent": current_fuel_state["fuel_percent"]
+                "fuel_percent": current_fuel_state["fuel_percent"],
+                "gps": gps_data,
+                "gps_speed_kts": speed_kts,
+                "gps_speed_kmh": gps_data.get("speed_kmh", 0.0),
+                "gps_heading_deg": gps_data.get("track_deg", 0.0),
+                "gps_cardinal": gps_data.get("cardinal_heading", "N"),
+                "gps_satellites": gps_data.get("satellites", 0),
+                "gps_has_fix": gps_data.get("has_fix", False),
+                "fuel_economy_l_nm": fuel_economy_l_nm
             })
 
             latest_telemetry = data
@@ -134,20 +153,28 @@ async def telemetry_background_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager for starting SQLite DB and background tasks."""
-    global yds_reader_instance, polling_task, current_fuel_state
-    logger.info("Initializing YDS Telemetry Backend & SQLite Database...")
+    """Lifespan context manager for starting SQLite DB, YDS Reader, and GPS Reader."""
+    global yds_reader_instance, gps_reader_instance, polling_task, current_fuel_state
+    logger.info("Initializing YDS Telemetry Backend, GPS Receiver & SQLite Database...")
 
     # Initialize SQLite Database
     database.init_db()
     current_fuel_state = database.get_fuel_state()
 
-    # Instantiate YDS Reader
+    # Instantiate YDS ECU Reader
     yds_reader_instance = YDSReader(
         port=cli_args.serial_port,
         baudrate=cli_args.baud,
         mock_mode=cli_args.mock
     )
+
+    # Instantiate GPS Receiver Reader
+    gps_reader_instance = GPSReader(
+        port=cli_args.gps_port,
+        mock_mode=cli_args.mock
+    )
+    gps_reader_instance.connect()
+    gps_reader_instance.start()
 
     # Start background polling task
     polling_task = asyncio.create_task(telemetry_background_loop())
@@ -164,6 +191,9 @@ async def lifespan(app: FastAPI):
 
     if yds_reader_instance:
         yds_reader_instance.close()
+
+    if gps_reader_instance:
+        gps_reader_instance.stop()
 
 
 # Initialize FastAPI Application

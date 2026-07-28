@@ -41,6 +41,12 @@
                 <span class="pill-dot warning-dot"></span> SIM
             </div>
 
+            <!-- GPS Satellite Status -->
+            <div id="gps-badge" class="status-pill connected">
+                <span class="pill-dot" id="gps-dot"></span>
+                <span id="gps-text">🛰️ -- SATS</span>
+            </div>
+
             <!-- Connection Status -->
             <div id="connection-badge" class="status-pill disconnected">
                 <span class="pill-dot" id="conn-dot"></span>
@@ -142,18 +148,18 @@
                                 </div>
                             </div>
 
-                            <!-- Card 3: Intake MAP Pressure -->
-                            <div class="card metric-card map-card">
+                            <!-- Card 3: GPS Speed & Heading -->
+                            <div class="card metric-card gps-card">
                                 <div class="card-header">
-                                    <span class="card-icon">💨</span>
-                                    <h3>INTAKE PRESS</h3>
+                                    <span class="card-icon">🛰️</span>
+                                    <h3>GPS SPEED</h3>
                                 </div>
                                 <div class="metric-body">
-                                    <span id="map-val" class="metric-value">99.09</span>
-                                    <span class="metric-unit">kPa</span>
+                                    <span id="gps-speed-val" class="metric-value highlight-cyan">0.0</span>
+                                    <span class="metric-unit">KTS</span>
                                 </div>
                                 <div class="metric-footer">
-                                    <span>BARO: <strong id="baro-val">990.9 hPa</strong></span>
+                                    <span>HDG: <strong id="gps-heading-val">0° N</strong> | EFF: <strong id="fuel-economy-val">0.00 L/NM</strong></span>
                                 </div>
                             </div>
 
