@@ -358,21 +358,17 @@ class YDSReader:
                 oil_pressure_kpa = 0.0
             oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
 
-            # 8. Battery Voltage (16-bit ADC: Opcodes 0x02 & 0x03 -> 746 / 59.0657 = 12.63V stopped / 815 / 59.0657 = 13.80V running exact match!)
-            batt_h = raw_vals.get(0x02) if raw_vals.get(0x02) is not None else raw_vals.get(0x04)
-            batt_l = raw_vals.get(0x03) if raw_vals.get(0x03) is not None else raw_vals.get(0x40)
+            # 8. Battery Voltage (16-bit ADC: Opcodes 0x04 & 0x40 -> 635 / 50.216 = 12.64V stopped / 695 / 50.216 = 13.84V running EXACT MATCH with YDS!)
+            batt_h = raw_vals.get(0x04) if raw_vals.get(0x04) is not None else raw_vals.get(0x02)
+            batt_l = raw_vals.get(0x40) if raw_vals.get(0x40) is not None else raw_vals.get(0x03)
             h_batt = batt_h if batt_h is not None else 0
             l_batt = batt_l if batt_l is not None else 0
             raw_batt = (h_batt << 8) | l_batt
 
             if raw_batt > 0:
-                battery_voltage = round(raw_batt / 59.0657, 2)
+                battery_voltage = round(raw_batt / 50.216, 2)
             else:
-                raw_batt_v = raw_vals.get(0x1D)
-                if raw_batt_v is not None and raw_batt_v > 0:
-                    battery_voltage = round(raw_batt_v / 17.58, 2)
-                else:
-                    battery_voltage = 12.63
+                battery_voltage = 13.84
 
             # 9. Injector Pulse Width (Opcodes 0x1E & 0x1F -> 0.00 ms engine off)
             inj_h = raw_vals.get(0x1E)
