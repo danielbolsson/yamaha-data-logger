@@ -60,6 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const gpsSpeedVal = document.getElementById("gps-speed-val");
     const gpsHeadingVal = document.getElementById("gps-heading-val");
     const fuelEconomyVal = document.getElementById("fuel-economy-val");
+    const fuelEconomyCardVal = document.getElementById("fuel-economy-card-val");
 
     const alertBanner = document.getElementById("alert-banner");
     const alertTitle = document.getElementById("alert-title");
@@ -516,6 +517,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (gpsSpeedVal) gpsSpeedVal.innerText = "--";
             if (gpsHeadingVal) gpsHeadingVal.innerText = "--° N";
             if (fuelEconomyVal) fuelEconomyVal.innerText = "-- L/NM";
+            if (fuelEconomyCardVal) fuelEconomyCardVal.innerText = "--";
 
             updateFlag(flagOil, false, "OIL --", "LOW OIL");
             updateFlag(flagTemp, false, "TEMP --", "OVERHEAT");
@@ -552,6 +554,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (gpsHeadingVal) gpsHeadingVal.innerText = `${Math.round(data.gps_heading_deg || 0)}° ${data.gps_cardinal || 'N'}`;
             if (fuelEconomyVal) {
                 fuelEconomyVal.innerText = (data.fuel_economy_l_nm > 0) ? `${data.fuel_economy_l_nm.toFixed(2)} L/NM` : "-- L/NM";
+            }
+            if (fuelEconomyCardVal) {
+                fuelEconomyCardVal.innerText = (data.fuel_economy_l_nm > 0) ? data.fuel_economy_l_nm.toFixed(2) : "--";
             }
         }
 
