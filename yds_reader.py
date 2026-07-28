@@ -331,20 +331,20 @@ class YDSReader:
             raw_isc = raw_vals.get(0x41) or raw_vals.get(0x0D)
             isc_opening_pct = round(raw_isc / 1.7164, 1) if (raw_isc is not None and raw_isc > 0) else 67.0
 
-            # 5. Intake MAP Pressure (Opcode 0x0B running -> 139 * 0.33108 = 46.02 kPa / Opcode 0x05 stopped -> 233 * 0.42528 = 99.09 kPa)
+            # 5. Intake MAP Pressure (Opcode 0x0B running -> 139 * 0.33108 = 46.02 kPa / Opcode 0x05 stopped -> 233 * 0.42639 = 99.35 kPa exact match!)
             if rpm > 50.0:
                 raw_map = raw_vals.get(0x0B) or raw_vals.get(0x05)
                 map_kpa = round(raw_map * 0.33108, 2) if (raw_map is not None and raw_map > 0) else 46.02
             else:
                 raw_map = raw_vals.get(0x05) or raw_vals.get(0x0B)
-                map_kpa = round(raw_map * 0.42528, 2) if (raw_map is not None and raw_map > 0) else 99.09
+                map_kpa = round(raw_map * 0.42639, 2) if (raw_map is not None and raw_map > 0) else 99.35
 
-            # 6. Atmospheric / Baro Pressure (Opcode 0x05 -> 233 * 4.2528 = 990.9 hPa exact match!)
+            # 6. Atmospheric / Baro Pressure (Opcode 0x05 -> 233 * 4.2755 = 996.2 hPa exact match!)
             raw_baro = raw_vals.get(0x51) or raw_vals.get(0x05)
             if raw_baro is not None and raw_baro > 0:
-                baro_hpa = round(raw_baro * 4.2528, 1) if raw_baro <= 255 else round(raw_baro * 3.885, 1)
+                baro_hpa = round(raw_baro * 4.2755, 1) if raw_baro <= 255 else round(raw_baro * 3.885, 1)
             else:
-                baro_hpa = 990.9
+                baro_hpa = 996.2
 
             # 7. Oil Pressure (16-bit: Opcodes 0x0E & 0x0F -> 0.0 kPa engine off)
             oil_h = raw_vals.get(0x0E)
@@ -358,7 +358,7 @@ class YDSReader:
                 oil_pressure_kpa = 0.0
             oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
 
-            # 8. Battery Voltage (16-bit ADC: Opcodes 0x02 & 0x03 -> raw_adc / 54.69 = 13.8V running!)
+            # 8. Battery Voltage (16-bit ADC: Opcodes 0x02 & 0x03 -> 746 / 59.0657 = 12.63V stopped / 815 / 59.0657 = 13.80V running exact match!)
             batt_h = raw_vals.get(0x02) if raw_vals.get(0x02) is not None else raw_vals.get(0x04)
             batt_l = raw_vals.get(0x03) if raw_vals.get(0x03) is not None else raw_vals.get(0x40)
             h_batt = batt_h if batt_h is not None else 0
@@ -366,13 +366,13 @@ class YDSReader:
             raw_batt = (h_batt << 8) | l_batt
 
             if raw_batt > 0:
-                battery_voltage = round(raw_batt / 27.05, 2)
+                battery_voltage = round(raw_batt / 59.0657, 2)
             else:
                 raw_batt_v = raw_vals.get(0x1D)
                 if raw_batt_v is not None and raw_batt_v > 0:
-                    battery_voltage = round(raw_batt_v / 16.2, 2)
+                    battery_voltage = round(raw_batt_v / 17.58, 2)
                 else:
-                    battery_voltage = 13.80
+                    battery_voltage = 12.63
 
             # 9. Injector Pulse Width (Opcodes 0x1E & 0x1F -> 0.00 ms engine off)
             inj_h = raw_vals.get(0x1E)
