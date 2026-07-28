@@ -474,35 +474,37 @@ document.addEventListener("DOMContentLoaded", () => {
             connText.innerText = "OFFLINE";
             pingText.innerText = "--ms";
 
-            digitalRpm.innerText = "N/A";
+            digitalRpm.innerText = "--";
             renderRpmGauge(0);
 
-            if (tpsVal) tpsVal.innerText = "N/A";
-            if (tpsFill) tpsFill.style.width = "0%";
-            if (tpsDegVal) tpsDegVal.innerText = "N/A";
+            if (headerHours) headerHours.innerText = "-- HRS";
 
-            if (engineTempVal) engineTempVal.innerText = "N/A";
+            if (tpsVal) tpsVal.innerText = "--";
+            if (tpsFill) tpsFill.style.width = "0%";
+            if (tpsDegVal) tpsDegVal.innerText = "--";
+
+            if (engineTempVal) engineTempVal.innerText = "--";
             if (tempStatusText) {
                 tempStatusText.innerText = "OFFLINE / IGNITION OFF";
                 tempStatusText.style.color = "#8a9bb0";
             }
 
-            if (batteryVal) batteryVal.innerText = "N/A";
+            if (batteryVal) batteryVal.innerText = "--";
             if (battStatusText) {
                 battStatusText.innerText = "OFFLINE";
                 battStatusText.style.color = "#8a9bb0";
             }
 
-            if (mapVal) mapVal.innerText = "N/A";
-            if (baroVal) baroVal.innerText = "N/A";
-            if (fuelRateVal) fuelRateVal.innerText = "N/A";
+            if (mapVal) mapVal.innerText = "--";
+            if (baroVal) baroVal.innerText = "--";
+            if (fuelRateVal) fuelRateVal.innerText = "--";
 
-            updateFlag(flagOil, false, "OIL N/A", "LOW OIL");
-            updateFlag(flagTemp, false, "TEMP N/A", "OVERHEAT");
-            updateFlag(flagBatt, false, "BATT N/A", "LOW VOLT");
-            updateFlag(flagCheck, false, "ENG N/A", "CHECK ENG");
-            if (flagIsc) flagIsc.innerText = "ISC: N/A";
-            if (fuelRangeHoursElem) fuelRangeHoursElem.innerText = "N/A";
+            updateFlag(flagOil, false, "OIL --", "LOW OIL");
+            updateFlag(flagTemp, false, "TEMP --", "OVERHEAT");
+            updateFlag(flagBatt, false, "BATT --", "LOW VOLT");
+            updateFlag(flagCheck, false, "ENG --", "CHECK ENG");
+            if (flagIsc) flagIsc.innerText = "ISC: --";
+            if (fuelRangeHoursElem) fuelRangeHoursElem.innerText = "--";
 
             hideAlertBanner();
             return;

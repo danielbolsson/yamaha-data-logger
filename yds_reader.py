@@ -57,6 +57,7 @@ class YDSReader:
         self.is_connected = False
         self.last_read_time = 0.0
         self.last_keepalive_time = 0.0
+        self.last_connect_attempt = 0.0
         self.keepalive_interval = 8.0  # Seconds between YDS keep-alive heartbeats
 
         # Calibrated YDS Opcodes (ECU 63P-8591A-01 from Windows YDS USB Sniff Capture)
@@ -110,6 +111,11 @@ class YDSReader:
         if not force_rehandshake and self.ser and getattr(self.ser, 'is_open', False):
             self.is_connected = True
             return True
+
+        now = time.time()
+        if (now - self.last_connect_attempt) < 3.0:
+            return False
+        self.last_connect_attempt = now
 
         if force_rehandshake and self.ser and getattr(self.ser, 'is_open', False):
             try:
