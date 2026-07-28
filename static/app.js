@@ -468,17 +468,50 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateUI(data) {
         lastTelemetry = data;
 
-        if (data.mock_mode) {
-            mockBadge.className = "status-pill mock-visible";
-        } else {
-            mockBadge.className = "status-pill mock-hidden";
-        }
+        if (data.status !== "ok" || data.connected === false) {
+            connBadge.className = "status-pill disconnected";
+            connDot.style.backgroundColor = "var(--accent-red)";
+            connText.innerText = "OFFLINE";
+            pingText.innerText = "--ms";
 
-        if (data.status !== "ok") {
-            digitalRpm.innerText = "0";
+            digitalRpm.innerText = "N/A";
             renderRpmGauge(0);
+
+            if (tpsVal) tpsVal.innerText = "N/A";
+            if (tpsFill) tpsFill.style.width = "0%";
+            if (tpsDegVal) tpsDegVal.innerText = "N/A";
+
+            if (engineTempVal) engineTempVal.innerText = "N/A";
+            if (tempStatusText) {
+                tempStatusText.innerText = "OFFLINE / IGNITION OFF";
+                tempStatusText.style.color = "#8a9bb0";
+            }
+
+            if (batteryVal) batteryVal.innerText = "N/A";
+            if (battStatusText) {
+                battStatusText.innerText = "OFFLINE";
+                battStatusText.style.color = "#8a9bb0";
+            }
+
+            if (mapVal) mapVal.innerText = "N/A";
+            if (baroVal) baroVal.innerText = "N/A";
+            if (fuelRateVal) fuelRateVal.innerText = "N/A";
+
+            updateFlag(flagOil, false, "OIL N/A", "LOW OIL");
+            updateFlag(flagTemp, false, "TEMP N/A", "OVERHEAT");
+            updateFlag(flagBatt, false, "BATT N/A", "LOW VOLT");
+            updateFlag(flagCheck, false, "ENG N/A", "CHECK ENG");
+            if (flagIsc) flagIsc.innerText = "ISC: N/A";
+            if (fuelRangeHoursElem) fuelRangeHoursElem.innerText = "N/A";
+
+            hideAlertBanner();
             return;
         }
+
+        // Connected Online State
+        connBadge.className = "status-pill connected";
+        connDot.style.backgroundColor = "var(--accent-green)";
+        connText.innerText = "ONLINE";
 
         // 1. Tachometer & TPS
         const rpm = Math.round(data.rpm || 0);

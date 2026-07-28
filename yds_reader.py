@@ -248,6 +248,14 @@ class YDSReader:
             raw_vals = {}
             for op in frame_opcodes:
                 raw_vals[op] = self.query_opcode(op)
+
+            # Check if ECU responded to queries (if 0 bytes returned -> Ignition is OFF or unplugged)
+            valid_responses = [v for v in raw_vals.values() if v is not None]
+            if len(valid_responses) == 0:
+                logger.warning("ECU did not respond to opcode queries. Ignition OFF or cable unplugged.")
+                self.is_connected = False
+                self.close()
+                return self._error_payload("Ignition OFF / Cable Unplugged")
                 time.sleep(0.01)
 
             hrs_l = raw_vals.get(0xE5)
@@ -507,7 +515,7 @@ class YDSReader:
     def _error_payload(self, error_msg: str) -> Dict[str, Any]:
         """Returns error snapshot when connection is offline or failing."""
         return {
-            "status": "error",
+            "status": "offline",
             "connected": False,
             "error": error_msg,
             "timestamp": time.time(),
