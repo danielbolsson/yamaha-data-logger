@@ -115,6 +115,12 @@ python3 server.py --serial-port /dev/ttyUSB0 --baud 9600 --web-port 8000
 - Open a web browser to **`http://localhost:8000`** or **`http://<RPI-IP>:8000`**.
 - Verify REST status API: `http://localhost:8000/api/status`
 
+### Direct File Transfer (SCP Deployment)
+If copying repository files directly to a remote Raspberry Pi via `scp` (without `git clone`), ensure all core Python modules and static assets are included:
+```bash
+scp -r server.py database.py yds_reader.py requirements.txt static/ admin@<PI-IP>:/path/to/yamaha-data-logger/
+```
+
 ---
 
 ## 5. Simulation / Mock Mode (Testing Without Hardware)

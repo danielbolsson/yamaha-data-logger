@@ -2,3 +2,9 @@ pyserial>=3.5
 fastapi>=0.100.0
 uvicorn[standard]>=0.22.0
 websockets>=11.0
+
+# Note: sqlite3 is included in Python standard library.
+# Core project Python modules required for deployment:
+# - server.py (FastAPI & WebSocket Server)
+# - database.py (SQLite Database Manager for Fuel & History)
+# - yds_reader.py (Yamaha ECU Opcode Telemetry Decoder)
