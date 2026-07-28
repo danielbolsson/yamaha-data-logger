@@ -183,21 +183,21 @@ http://<RASPBERRY-PI-IP>:8000
 ```
 The server broadcasts WebSocket telemetry to multiple concurrent client devices with ultra-low latency.
 
-### B. Raspberry Pi Touchscreen Kiosk Mode
-To launch Chromium automatically in full-screen kiosk mode on boot:
+### B. Raspberry Pi 7" Touchscreen Kiosk Mode (800 x 480 Resolution)
+To launch Chromium automatically in full-screen 800x480 kiosk mode on boot:
 
 1. Install dependencies:
    ```bash
    sudo apt install -y chromium-browser unclutter
    ```
 
-2. Add autostart entries in `~/.config/lxsession/LXDE-pi/autostart` (or equivalent compositor config):
+2. Add autostart entries in `~/.config/lxsession/LXDE-pi/autostart` (or Wayland/labwc config):
    ```bash
    @xset s off
    @xset -dpms
    @xset s noblank
    @unclutter -idle 0.5 -root
-   @chromium-browser --noerrdialogs --disable-infobars --kiosk http://localhost:8000
+   @chromium-browser --noerrdialogs --disable-infobars --kiosk --window-size=800,480 --window-position=0,0 http://localhost:8000
    ```
 
 ---

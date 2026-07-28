@@ -1,7 +1,9 @@
 /**
  * Yamaha YDS Real-Time Telemetry Dashboard Frontend Engine.
- * Handles Canvas Gauge Rendering, WebSocket Auto-Reconnect, Chart.js Trends, and Alarm Overlays.
+ * Multi-Page Kiosk Architecture (800x480 resolution optimized for Raspberry Pi Touchscreen).
  */
+
+let switchDashboardPage = function () { };
 
 document.addEventListener("DOMContentLoaded", () => {
     // --- State Variables ---
@@ -9,23 +11,33 @@ document.addEventListener("DOMContentLoaded", () => {
     let reconnectTimer = null;
     let pingStartTime = 0;
     let currentLatency = 0;
-
+    let activePage = 1;
     let useFahrenheit = false;
-    let currentTelemetry = null;
 
-    // History data arrays for Chart.js (max 40 data points ~8 seconds of history)
+    // History data arrays (max 40 points ~8 seconds of continuous telemetry history)
     const MAX_HISTORY = 40;
     const timeLabels = [];
     const rpmHistory = [];
-    const fuelHistory = [];
+    const mapHistory = [];
+    const tpsHistory = [];
+    const engTempHistory = [];
+    const intakeTempHistory = [];
+    const battHistory = [];
+    const oilHistory = [];
 
     // --- DOM Elements ---
+    const pageSlider = document.getElementById("page-slider");
+    const navBtn1 = document.getElementById("nav-btn-1");
+    const navBtn2 = document.getElementById("nav-btn-2");
+    const navBtn3 = document.getElementById("nav-btn-3");
+
     const connBadge = document.getElementById("connection-badge");
     const connDot = document.getElementById("conn-dot");
     const connText = document.getElementById("conn-text");
     const pingText = document.getElementById("ping-text");
     const mockBadge = document.getElementById("mock-badge");
     const tempToggleBtn = document.getElementById("temp-toggle-btn");
+    const headerHours = document.getElementById("header-hours");
 
     const alertBanner = document.getElementById("alert-banner");
     const alertTitle = document.getElementById("alert-title");
@@ -34,22 +46,103 @@ document.addEventListener("DOMContentLoaded", () => {
     const digitalRpm = document.getElementById("digital-rpm-val");
     const tpsVal = document.getElementById("tps-value");
     const tpsFill = document.getElementById("tps-fill");
+    const tpsDegVal = document.getElementById("tps-deg-val");
 
     const fuelRateVal = document.getElementById("fuel-rate-val");
     const engineTempVal = document.getElementById("engine-temp-val");
     const engineTempUnit = document.getElementById("engine-temp-unit");
-    const tempCardElem = document.getElementById("temp-card-elem");
+    const tempStatusText = document.getElementById("temp-status-text");
 
     const batteryVal = document.getElementById("battery-val");
-    const battCardElem = document.getElementById("batt-card-elem");
+    const battStatusText = document.getElementById("batt-status-text");
     const mapVal = document.getElementById("map-val");
+    const baroVal = document.getElementById("baro-val");
     const injectorVal = document.getElementById("injector-val");
-    const engineHoursVal = document.getElementById("engine-hours-val");
 
     const flagOil = document.getElementById("flag-oil");
     const flagTemp = document.getElementById("flag-temp");
     const flagCheck = document.getElementById("flag-check");
     const flagBatt = document.getElementById("flag-batt");
+    const flagIsc = document.getElementById("flag-isc");
+
+    // --- Restore User Preferences ---
+    const savedUnit = localStorage.getItem("yamaha_temp_unit");
+    if (savedUnit === "F") {
+        useFahrenheit = true;
+        tempToggleBtn.innerText = "°F";
+    }
+
+    const savedPage = localStorage.getItem("yamaha_kiosk_page");
+    if (savedPage) {
+        activePage = parseInt(savedPage, 10) || 1;
+    }
+
+    // --- Page Switcher ---
+    switchDashboardPage = function (pageNum) {
+        if (pageNum < 1 || pageNum > 3) return;
+        activePage = pageNum;
+        localStorage.setItem("yamaha_kiosk_page", pageNum);
+
+        pageSlider.className = `page-slider active-page-${pageNum}`;
+
+        [navBtn1, navBtn2, navBtn3].forEach((btn, idx) => {
+            if (idx + 1 === pageNum) {
+                btn.classList.add("active");
+            } else {
+                btn.classList.remove("active");
+            }
+        });
+    };
+
+    switchDashboardPage(activePage);
+
+    // Touch Swipe Gesture Handler for Kiosk Screen
+    let touchStartX = 0;
+    let touchStartY = 0;
+    document.addEventListener("touchstart", (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, false);
+
+    document.addEventListener("touchend", (e) => {
+        const diffX = e.changedTouches[0].screenX - touchStartX;
+        const diffY = e.changedTouches[0].screenY - touchStartY;
+        if (Math.abs(diffX) > 60 && Math.abs(diffY) < 50) {
+            if (diffX < 0 && activePage < 3) {
+                switchDashboardPage(activePage + 1);
+            } else if (diffX > 0 && activePage > 1) {
+                switchDashboardPage(activePage - 1);
+            }
+        }
+    }, false);
+
+    // Keyboard Hotkey Navigation (F1/F2/F3, 1/2/3, Left/Right Arrow)
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "F1" || e.key === "1") {
+            e.preventDefault();
+            switchDashboardPage(1);
+        } else if (e.key === "F2" || e.key === "2") {
+            e.preventDefault();
+            switchDashboardPage(2);
+        } else if (e.key === "F3" || e.key === "3") {
+            e.preventDefault();
+            switchDashboardPage(3);
+        } else if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            if (activePage > 1) switchDashboardPage(activePage - 1);
+        } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            if (activePage < 3) switchDashboardPage(activePage + 1);
+        }
+    });
+
+    // --- Unit Toggle ---
+    tempToggleBtn.addEventListener("click", () => {
+        useFahrenheit = !useFahrenheit;
+        tempToggleBtn.innerText = useFahrenheit ? "°F" : "°C";
+        localStorage.setItem("yamaha_temp_unit", useFahrenheit ? "F" : "C");
+        if (lastTelemetry) updateUI(lastTelemetry);
+    });
 
     // --- Canvas Tachometer Setup ---
     const gaugeCanvas = document.getElementById("rpmGaugeCanvas");
@@ -64,7 +157,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         ctx.clearRect(0, 0, width, height);
 
-        // Angles for gauge (225 degrees total arc: 135deg to 405deg)
         const startAngle = 0.75 * Math.PI; // 135 deg
         const endAngle = 2.25 * Math.PI;   // 405 deg
         const totalAngle = endAngle - startAngle;
@@ -74,53 +166,50 @@ document.addEventListener("DOMContentLoaded", () => {
         const fillPct = clampedRpm / maxRpm;
         const currentAngle = startAngle + (fillPct * totalAngle);
 
-        // 1. Background Arc Track
+        // Track Arc
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, startAngle, endAngle, false);
-        ctx.lineWidth = 18;
+        ctx.lineWidth = 14;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
         ctx.lineCap = "round";
         ctx.stroke();
 
-        // 2. Redline Zone Arc (5200 RPM to 6000 RPM)
+        // Redline Zone Arc (5200 to 6000 RPM)
         const redlineStart = startAngle + ((5200 / maxRpm) * totalAngle);
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, redlineStart, endAngle, false);
-        ctx.lineWidth = 18;
-        ctx.strokeStyle = "rgba(255, 23, 68, 0.35)";
+        ctx.lineWidth = 14;
+        ctx.strokeStyle = "rgba(255, 23, 68, 0.4)";
         ctx.lineCap = "round";
         ctx.stroke();
 
-        // 3. Dynamic Active RPM Arc (Gradient Fill)
+        // Active Arc
         if (clampedRpm > 10) {
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, startAngle, currentAngle, false);
-            ctx.lineWidth = 18;
+            ctx.lineWidth = 14;
             ctx.lineCap = "round";
 
-            const gradient = ctx.createConicGradient(startAngle, centerX, centerY);
-            gradient.addColorStop(0, "#00e5ff");
-            gradient.addColorStop(0.6, "#00e676");
-            gradient.addColorStop(0.85, "#ffb700");
-            gradient.addColorStop(1.0, "#ff1744");
-
-            ctx.strokeStyle = gradient;
+            if (clampedRpm > 5200) {
+                ctx.strokeStyle = "#ff1744";
+            } else {
+                const grad = ctx.createLinearGradient(0, height, width, 0);
+                grad.addColorStop(0, "#00e5ff");
+                grad.addColorStop(1, "#0077ff");
+                ctx.strokeStyle = grad;
+            }
             ctx.stroke();
         }
 
-        // 4. Tick Marks & Numbers
+        // Ticks
         for (let i = 0; i <= 6; i++) {
-            const tickRpm = i * 1000;
-            const tickPct = tickRpm / maxRpm;
-            const angle = startAngle + (tickPct * totalAngle);
-
-            const innerRadius = radius - 16;
-            const outerRadius = radius - 6;
-
-            const x1 = centerX + Math.cos(angle) * innerRadius;
-            const y1 = centerY + Math.sin(angle) * innerRadius;
-            const x2 = centerX + Math.cos(angle) * outerRadius;
-            const y2 = centerY + Math.sin(angle) * outerRadius;
+            const angle = startAngle + ((i / 6) * totalAngle);
+            const innerR = radius - 16;
+            const outerR = radius - 8;
+            const x1 = centerX + Math.cos(angle) * innerR;
+            const y1 = centerY + Math.sin(angle) * innerR;
+            const x2 = centerX + Math.cos(angle) * outerR;
+            const y2 = centerY + Math.sin(angle) * outerR;
 
             ctx.beginPath();
             ctx.moveTo(x1, y1);
@@ -129,310 +218,298 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.strokeStyle = i >= 5 ? "#ff1744" : "rgba(255, 255, 255, 0.4)";
             ctx.stroke();
 
-            // Label
-            const textRadius = radius - 30;
-            const tx = centerX + Math.cos(angle) * textRadius;
-            const ty = centerY + Math.sin(angle) * textRadius;
-
-            ctx.font = "bold 13px 'Chakra Petch', sans-serif";
-            ctx.fillStyle = i >= 5 ? "#ff1744" : "#8a9bb0";
+            // Labels
+            const labelR = radius - 26;
+            const lx = centerX + Math.cos(angle) * labelR;
+            const ly = centerY + Math.sin(angle) * labelR;
+            ctx.font = "bold 9px 'Chakra Petch', sans-serif";
+            ctx.fillStyle = i >= 5 ? "#ff1744" : "rgba(255, 255, 255, 0.6)";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(i.toString(), tx, ty);
+            ctx.fillText(i.toString(), lx, ly);
         }
-
-        // 5. Center Pointer / Needle
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(currentAngle);
-
-        ctx.beginPath();
-        ctx.moveTo(-10, 0);
-        ctx.lineTo(radius - 22, 0);
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = clampedRpm >= 5200 ? "#ff1744" : "#00e5ff";
-        ctx.shadowColor = clampedRpm >= 5200 ? "#ff1744" : "#00e5ff";
-        ctx.shadowBlur = 10;
-        ctx.stroke();
-
-        ctx.restore();
-
-        // Needle Pivot Center Cap
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
     }
 
-    // Render initial empty gauge
     renderRpmGauge(0);
 
-    // --- Chart.js Real-time Trend Setup ---
-    const chartCtx = document.getElementById("trendChart").getContext("2d");
-    const trendChart = new Chart(chartCtx, {
-        type: 'line',
+    // --- Chart.js Setup for Pages 2 & 3 ---
+    const chartDefaultOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: {
+            x: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { display: false } },
+            y: { grid: { color: "rgba(255,255,255,0.08)" }, ticks: { color: "#8a9bb0", font: { size: 9 } } }
+        }
+    };
+
+    // Page 2 - RPM Chart
+    const rpmChartCtx = document.getElementById("rpmChartCanvas").getContext("2d");
+    const rpmChart = new Chart(rpmChartCtx, {
+        type: "line",
+        data: {
+            labels: timeLabels,
+            datasets: [{
+                data: rpmHistory,
+                borderColor: "#00e5ff",
+                borderWidth: 2,
+                backgroundColor: "rgba(0, 229, 255, 0.1)",
+                fill: true,
+                pointRadius: 0,
+                tension: 0.2
+            }]
+        },
+        options: { ...chartDefaultOptions, scales: { ...chartDefaultOptions.scales, y: { min: 0, max: 6000, ticks: { color: "#8a9bb0", font: { size: 9 } } } } }
+    });
+
+    // Page 2 - MAP & TPS Chart
+    const mapTpsChartCtx = document.getElementById("mapTpsChartCanvas").getContext("2d");
+    const mapTpsChart = new Chart(mapTpsChartCtx, {
+        type: "line",
         data: {
             labels: timeLabels,
             datasets: [
-                {
-                    label: 'RPM',
-                    data: rpmHistory,
-                    borderColor: '#00e5ff',
-                    backgroundColor: 'rgba(0, 229, 255, 0.08)',
-                    fill: true,
-                    tension: 0.3,
-                    yAxisID: 'yRPM',
-                    pointRadius: 0
-                },
-                {
-                    label: 'Fuel (L/h)',
-                    data: fuelHistory,
-                    borderColor: '#ffb700',
-                    backgroundColor: 'transparent',
-                    borderDash: [4, 4],
-                    tension: 0.3,
-                    yAxisID: 'yFuel',
-                    pointRadius: 0
-                }
+                { label: "MAP", data: mapHistory, borderColor: "#00e5ff", borderWidth: 2, pointRadius: 0, yAxisID: "y" },
+                { label: "TPS", data: tpsHistory, borderColor: "#ffb700", borderWidth: 2, pointRadius: 0, yAxisID: "y1" }
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            plugins: {
-                legend: { display: false }
-            },
+            ...chartDefaultOptions,
             scales: {
-                x: {
-                    display: false
-                },
-                yRPM: {
-                    type: 'linear',
-                    position: 'left',
-                    min: 0,
-                    max: 6000,
-                    ticks: { color: '#8a9bb0', font: { size: 10 } },
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
-                },
-                yFuel: {
-                    type: 'linear',
-                    position: 'right',
-                    min: 0,
-                    max: 60,
-                    ticks: { color: '#ffb700', font: { size: 10 } },
-                    grid: { drawOnChartArea: false }
-                }
+                x: { ticks: { display: false } },
+                y: { type: "linear", display: true, position: "left", min: 0, max: 110, ticks: { color: "#00e5ff", font: { size: 8 } } },
+                y1: { type: "linear", display: true, position: "right", min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { color: "#ffb700", font: { size: 8 } } }
             }
         }
     });
+
+    // Page 3 - Temperature Chart
+    const tempChartCtx = document.getElementById("tempChartCanvas").getContext("2d");
+    const tempChart = new Chart(tempChartCtx, {
+        type: "line",
+        data: {
+            labels: timeLabels,
+            datasets: [
+                { label: "Eng Temp", data: engTempHistory, borderColor: "#ff1744", borderWidth: 2, pointRadius: 0 },
+                { label: "Intake Temp", data: intakeTempHistory, borderColor: "#0077ff", borderWidth: 2, pointRadius: 0 }
+            ]
+        },
+        options: chartDefaultOptions
+    });
+
+    // Page 3 - Battery & Oil Chart
+    const battOilChartCtx = document.getElementById("battOilChartCanvas").getContext("2d");
+    const battOilChart = new Chart(battOilChartCtx, {
+        type: "line",
+        data: {
+            labels: timeLabels,
+            datasets: [
+                { label: "Batt V", data: battHistory, borderColor: "#ffb700", borderWidth: 2, pointRadius: 0, yAxisID: "y" },
+                { label: "Oil Press", data: oilHistory, borderColor: "#00e676", borderWidth: 2, pointRadius: 0, yAxisID: "y1" }
+            ]
+        },
+        options: {
+            ...chartDefaultOptions,
+            scales: {
+                x: { ticks: { display: false } },
+                y: { type: "linear", display: true, position: "left", min: 9, max: 16, ticks: { color: "#ffb700", font: { size: 8 } } },
+                y1: { type: "linear", display: true, position: "right", min: 0, max: 500, grid: { drawOnChartArea: false }, ticks: { color: "#00e676", font: { size: 8 } } }
+            }
+        }
+    });
+
+    // --- Update Telemetry UI Engine ---
+    let lastTelemetry = null;
+
+    function updateUI(data) {
+        lastTelemetry = data;
+
+        if (data.mock_mode) {
+            mockBadge.className = "status-pill mock-visible";
+        } else {
+            mockBadge.className = "status-pill mock-hidden";
+        }
+
+        if (data.status !== "ok") {
+            digitalRpm.innerText = "0";
+            renderRpmGauge(0);
+            return;
+        }
+
+        // 1. Tachometer & TPS
+        const rpm = Math.round(data.rpm || 0);
+        digitalRpm.innerText = rpm.toString();
+        renderRpmGauge(rpm);
+
+        const tps = data.tps_percent || 0;
+        const tpsV = (data.tps_volts || 0.679).toFixed(3);
+        const tpsDeg = (data.tps_deg || -0.5).toFixed(1);
+        tpsVal.innerText = `${tps.toFixed(1)}% (${tpsV}V)`;
+        tpsFill.style.width = `${Math.max(0, Math.min(100, tps))}%`;
+        tpsDegVal.innerText = `${tpsDeg}°`;
+
+        // 2. Engine Hours
+        if (data.engine_hours) {
+            headerHours.innerText = `${data.engine_hours.toFixed(1)} HRS`;
+        }
+
+        // 3. Engine Temperature
+        const tempC = data.engine_temp_c || 0;
+        const tempF = data.engine_temp_f || (tempC * 1.8 + 32);
+        engineTempVal.innerText = useFahrenheit ? tempF.toFixed(1) : tempC.toFixed(1);
+        engineTempUnit.innerText = useFahrenheit ? "°F" : "°C";
+
+        if (tempC > 95) {
+            tempStatusText.innerText = "OVERHEAT WARNING!";
+            tempStatusText.style.color = "#ff1744";
+        } else if (tempC > 75) {
+            tempStatusText.innerText = "WARM";
+            tempStatusText.style.color = "#ffb700";
+        } else {
+            tempStatusText.innerText = "NORMAL (33-75°C)";
+            tempStatusText.style.color = "#8a9bb0";
+        }
+
+        // 4. Battery Voltage
+        const battV = data.battery_voltage || 12.89;
+        batteryVal.innerText = battV.toFixed(2);
+        if (battV > 13.4) {
+            battStatusText.innerText = "ALT. CHARGING";
+            battStatusText.style.color = "#00e676";
+        } else if (battV < 11.8) {
+            battStatusText.innerText = "LOW VOLTAGE!";
+            battStatusText.style.color = "#ff1744";
+        } else {
+            battStatusText.innerText = "STANDBY";
+            battStatusText.style.color = "#8a9bb0";
+        }
+
+        // 5. Intake MAP Pressure & Baro
+        mapVal.innerText = (data.map_kpa || 99.09).toFixed(2);
+        baroVal.innerText = `${(data.baro_hpa || 990.9).toFixed(1)} hPa`;
+
+        // 6. Fuel Rate & Injector Pulse
+        fuelRateVal.innerText = (data.fuel_rate_lh || 0.0).toFixed(2);
+        injectorVal.innerText = `${(data.injector_ms || 0.0).toFixed(2)} ms`;
+
+        // 7. Alarms & Status Flags
+        const warnings = data.warnings || {};
+        updateFlag(flagOil, warnings.low_oil_pressure, "OIL OK", "LOW OIL");
+        updateFlag(flagTemp, warnings.overheat, "TEMP OK", "OVERHEAT");
+        updateFlag(flagBatt, warnings.low_voltage, "BATT OK", "LOW VOLT");
+        updateFlag(flagCheck, warnings.check_engine, "ENG OK", "CHECK ENG");
+
+        if (data.isc_opening_pct !== undefined) {
+            flagIsc.innerText = `ISC: ${Math.round(data.isc_opening_pct)}%`;
+        }
+
+        // Alarm Banner
+        if (warnings.overheat) {
+            showAlertBanner("ENGINE OVERHEAT WARNING", "Reduce throttle immediately and inspect cooling intake!");
+        } else if (warnings.low_oil_pressure) {
+            showAlertBanner("LOW OIL PRESSURE ALARM", "Shutdown engine immediately and check oil level!");
+        } else if (warnings.low_voltage) {
+            showAlertBanner("LOW BATTERY VOLTAGE", "Battery voltage dropped below 11.8V!");
+        } else {
+            hideAlertBanner();
+        }
+
+        // 8. History Trends Chart Push
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        timeLabels.push(nowStr);
+        rpmHistory.push(rpm);
+        mapHistory.push(data.map_kpa || 99.09);
+        tpsHistory.push(tps);
+        engTempHistory.push(useFahrenheit ? tempF : tempC);
+        intakeTempHistory.push(useFahrenheit ? (data.intake_temp_f || 79.7) : (data.intake_temp_c || 26.6));
+        battHistory.push(battV);
+        oilHistory.push(data.oil_pressure_kpa || 0);
+
+        if (timeLabels.length > MAX_HISTORY) {
+            timeLabels.shift();
+            rpmHistory.shift();
+            mapHistory.shift();
+            tpsHistory.shift();
+            engTempHistory.shift();
+            intakeTempHistory.shift();
+            battHistory.shift();
+            oilHistory.shift();
+        }
+
+        rpmChart.update();
+        mapTpsChart.update();
+        tempChart.update();
+        battOilChart.update();
+    }
+
+    function updateFlag(elem, isAlarm, okText, alarmText) {
+        if (isAlarm) {
+            elem.innerText = alarmText;
+            elem.className = "diag-flag alarm-active";
+        } else {
+            elem.innerText = okText;
+            elem.className = "diag-flag";
+        }
+    }
+
+    function showAlertBanner(title, detail) {
+        alertTitle.innerText = title;
+        alertDetail.innerText = detail;
+        alertBanner.classList.remove("hidden");
+    }
+
+    function hideAlertBanner() {
+        alertBanner.classList.add("hidden");
+    }
 
     // --- WebSocket Manager ---
     function connectWebSocket() {
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${window.location.host}/ws/telemetry`;
 
-        console.log(`Connecting to WebSocket: ${wsUrl}`);
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-            console.log("WebSocket connected!");
-            connBadge.classList.remove("disconnected");
-            connBadge.classList.add("connected");
+            connBadge.className = "status-pill connected";
             connDot.style.backgroundColor = "var(--accent-green)";
-            connText.textContent = "LIVE";
-
-            // Start ping timer
+            connText.innerText = "ONLINE";
             pingStartTime = Date.now();
-            ws.send("ping");
-
-            if (reconnectTimer) {
-                clearInterval(reconnectTimer);
-                reconnectTimer = null;
-            }
+            ws.send(JSON.stringify({ type: "ping" }));
         };
 
         ws.onmessage = (event) => {
             try {
-                const data = JSON.parse(event.data);
-
-                // Handle ping response latency
-                if (data.pong) {
+                const msg = JSON.parse(event.data);
+                if (msg.type === "pong") {
                     currentLatency = Date.now() - pingStartTime;
-                    pingText.textContent = `${currentLatency} ms`;
-                    return;
+                    pingText.innerText = `${currentLatency}ms`;
+                    setTimeout(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            pingStartTime = Date.now();
+                            ws.send(JSON.stringify({ type: "ping" }));
+                        }
+                    }, 3000);
+                } else {
+                    updateUI(msg);
                 }
-
-                // Process Telemetry Frame
-                updateDashboardUI(data);
-
-            } catch (err) {
-                console.error("Error parsing WebSocket JSON payload:", err);
+            } catch (e) {
+                console.error("Error parsing WebSocket packet:", e);
             }
         };
 
         ws.onclose = () => {
-            console.warn("WebSocket connection lost.");
-            connBadge.classList.remove("connected");
-            connBadge.classList.add("disconnected");
+            connBadge.className = "status-pill disconnected";
             connDot.style.backgroundColor = "var(--accent-red)";
-            connText.textContent = "DISCONNECTED";
-            pingText.textContent = "-- ms";
-
-            // Schedule reconnect
-            if (!reconnectTimer) {
-                reconnectTimer = setInterval(connectWebSocket, 2000);
-            }
+            connText.innerText = "OFFLINE";
+            pingText.innerText = "--ms";
+            reconnectTimer = setTimeout(connectWebSocket, 2000);
         };
 
-        ws.onerror = (err) => {
-            console.error("WebSocket error:", err);
+        ws.onerror = () => {
             ws.close();
         };
     }
 
-    // Measure ping latency every 3 seconds
-    setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            pingStartTime = Date.now();
-            ws.send("ping");
-        }
-    }, 3000);
-
-    // --- Temperature Unit Toggle ---
-    tempToggleBtn.addEventListener("click", () => {
-        useFahrenheit = !useFahrenheit;
-        tempToggleBtn.textContent = useFahrenheit ? "°F" : "°C";
-        if (currentTelemetry) {
-            updateDashboardUI(currentTelemetry);
-        }
-    });
-
-    // --- Update UI with Telemetry Data ---
-    function updateDashboardUI(data) {
-        currentTelemetry = data;
-
-        // Toggle Mock Badge
-        if (data.is_mock) {
-            mockBadge.classList.remove("mock-hidden");
-        } else {
-            mockBadge.classList.add("mock-hidden");
-        }
-
-        // 1. Tachometer & TPS
-        const rpm = Math.round(data.rpm || 0);
-        digitalRpm.textContent = rpm.toLocaleString();
-        renderRpmGauge(rpm);
-
-        const tps = data.tps_percent || 0;
-        tpsVal.textContent = `${tps.toFixed(1)} %`;
-        tpsFill.style.width = `${Math.min(100, Math.max(0, tps))}%`;
-
-        // 2. Fuel Consumption
-        fuelRateVal.textContent = (data.fuel_rate_lh || 0).toFixed(2);
-
-        // 3. Engine Temperature
-        const tempC = data.engine_temp_c || 0;
-        const tempF = data.engine_temp_f || 32;
-        if (useFahrenheit) {
-            engineTempVal.textContent = Math.round(tempF);
-            engineTempUnit.textContent = "°F";
-        } else {
-            engineTempVal.textContent = Math.round(tempC);
-            engineTempUnit.textContent = "°C";
-        }
-
-        // Temp warning border color
-        if (tempC >= 85) {
-            tempCardElem.style.borderColor = "var(--accent-red)";
-        } else if (tempC >= 75) {
-            tempCardElem.style.borderColor = "var(--accent-amber)";
-        } else {
-            tempCardElem.style.borderColor = "var(--bg-card-border)";
-        }
-
-        // 4. Battery Voltage
-        const batt = data.battery_voltage || 0;
-        batteryVal.textContent = batt.toFixed(1);
-        if (batt < 11.8 || batt > 15.2) {
-            battCardElem.style.borderColor = "var(--accent-red)";
-        } else {
-            battCardElem.style.borderColor = "var(--bg-card-border)";
-        }
-
-        // 5. MAP & Injector
-        mapVal.textContent = (data.map_kpa || 0).toFixed(1);
-        injectorVal.textContent = (data.injector_ms || 0).toFixed(2);
-        engineHoursVal.textContent = `${(data.engine_hours || 0).toFixed(1)} HRS`;
-
-        // 6. Diagnostics & Alerts
-        const warnings = data.warnings || {};
-
-        // Oil Flag
-        if (warnings.low_oil_pressure) {
-            flagOil.textContent = "LOW OIL";
-            flagOil.classList.add("alert");
-        } else {
-            flagOil.textContent = "OIL OK";
-            flagOil.classList.remove("alert");
-        }
-
-        // Temp Flag
-        if (warnings.overheat || tempC >= 85) {
-            flagTemp.textContent = "OVERHEAT";
-            flagTemp.classList.add("alert");
-        } else {
-            flagTemp.textContent = "TEMP OK";
-            flagTemp.classList.remove("alert");
-        }
-
-        // Check Engine Flag
-        if (warnings.check_engine) {
-            flagCheck.textContent = "ECU FAULT";
-            flagCheck.classList.add("alert");
-        } else {
-            flagCheck.textContent = "CHECK OK";
-            flagCheck.classList.remove("alert");
-        }
-
-        // Battery Flag
-        if (warnings.low_voltage || batt < 11.8) {
-            flagBatt.textContent = "LOW BATT";
-            flagBatt.classList.add("alert");
-        } else {
-            flagBatt.textContent = "BATT OK";
-            flagBatt.classList.remove("alert");
-        }
-
-        // Prominent Alert Banner Display
-        if (warnings.overheat || warnings.low_oil_pressure) {
-            alertBanner.classList.remove("hidden");
-            if (warnings.overheat) {
-                alertTitle.textContent = "⚠️ ENGINE OVERHEAT ALARM";
-                alertDetail.textContent = `Engine temp reaching ${tempC.toFixed(1)}°C! Reduce speed immediately!`;
-            } else if (warnings.low_oil_pressure) {
-                alertTitle.textContent = "⚠️ LOW OIL PRESSURE ALARM";
-                alertDetail.textContent = "Critical engine oil pressure drop detected!";
-            }
-        } else {
-            alertBanner.classList.add("hidden");
-        }
-
-        // 7. Update Live Chart History
-        const nowStr = new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' });
-        timeLabels.push(nowStr);
-        rpmHistory.push(rpm);
-        fuelHistory.push(data.fuel_rate_lh || 0);
-
-        if (timeLabels.length > MAX_HISTORY) {
-            timeLabels.shift();
-            rpmHistory.shift();
-            fuelHistory.shift();
-        }
-
-        trendChart.update('none'); // Update without full re-animation for performance
-    }
-
-    // Initialize Connection
     connectWebSocket();
 });
