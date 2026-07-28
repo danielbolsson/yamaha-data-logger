@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yamaha Telemetry Dashboard - F150</title>
+
+    <!-- Google Fonts for High-Readability Helm UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;600;700&family=Orbitron:wght@600;800;900&display=swap"
+        rel="stylesheet">
+
+    <!-- Chart.js for Telemetry History -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body class="helm-theme">
+
+    <!-- Top Navigation / Status Header -->
+    <header class="helm-header">
+        <div class="header-brand">
+            <div class="logo-mark">YDS</div>
+            <div class="header-titles">
+                <h1>YAMAHA F150 TELEMETRY</h1>
+                <span class="sub-title">ECU 63P-01 | K-Line ISO 9141</span>
+            </div>
+        </div>
+
+        <div class="header-indicators">
+            <!-- Sim / Mock Mode Badge -->
+            <div id="mock-badge" class="status-pill mock-hidden">
+                <span class="pill-dot warning-dot"></span> SIMULATION
+            </div>
+
+            <!-- Connection Status -->
+            <div id="connection-badge" class="status-pill disconnected">
+                <span class="pill-dot" id="conn-dot"></span>
+                <span id="conn-text">OFFLINE</span>
+                <span id="ping-text" class="ping-ms">-- ms</span>
+            </div>
+
+            <!-- Units Toggle Button -->
+            <button id="temp-toggle-btn" class="ctrl-btn" title="Toggle °C / °F">
+                °C
+            </button>
+        </div>
+    </header>
+
+    <!-- Critical Alarm Banner (Hidden by default) -->
+    <div id="alert-banner" class="alert-banner hidden">
+        <div class="alert-content">
+            <span class="alert-icon">⚠️</span>
+            <div class="alert-message">
+                <h2 id="alert-title">ENGINE OVERHEAT WARNING</h2>
+                <p id="alert-detail">Reduce throttle immediately and check water intake!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Grid Layout -->
+    <main class="dashboard-grid">
+
+        <!-- Column 1: Primary RPM Gauge & Throttle Position -->
+        <section class="card gauge-card">
+            <div class="card-header">
+                <h2>ENGINE TACHOMETER</h2>
+                <span class="unit-tag">RPM</span>
+            </div>
+
+            <div class="gauge-container">
+                <canvas id="rpmGaugeCanvas" width="340" height="340"></canvas>
+                <div class="gauge-digital-overlay">
+                    <span id="digital-rpm-val" class="digital-huge">0</span>
+                    <span class="digital-unit">RPM</span>
+                </div>
+            </div>
+
+            <div class="tps-bar-container">
+                <div class="tps-header">
+                    <span>THROTTLE POSITION (TPS)</span>
+                    <span id="tps-value" class="tps-val">0.0 %</span>
+                </div>
+                <div class="tps-track">
+                    <div id="tps-fill" class="tps-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Column 2: Digital Telemetry Readout Cards -->
+        <section class="metrics-column">
+
+            <div class="metrics-grid">
+
+                <!-- Fuel Consumption Rate (L/h) -->
+                <div class="card metric-card fuel-card">
+                    <div class="card-header">
+                        <span class="card-icon">⛽</span>
+                        <h3>FUEL RATE</h3>
+                    </div>
+                    <div class="metric-body">
+                        <span id="fuel-rate-val" class="metric-value highlight-cyan">0.00</span>
+                        <span class="metric-unit">L / hr</span>
+                    </div>
+                    <div class="metric-footer">
+                        <span>EST. FLOW RATE</span>
+                    </div>
+                </div>
+
+                <!-- Engine Temperature -->
+                <div class="card metric-card temp-card" id="temp-card-elem">
+                    <div class="card-header">
+                        <span class="card-icon">🌡️</span>
+                        <h3>ENGINE TEMP</h3>
+                    </div>
+                    <div class="metric-body">
+                        <span id="engine-temp-val" class="metric-value">--</span>
+                        <span id="engine-temp-unit" class="metric-unit">°C</span>
+                    </div>
+                    <div class="metric-footer">
+                        <span>NORMAL: 50-75°C</span>
+                    </div>
+                </div>
+
+                <!-- Battery / Alternator Voltage -->
+                <div class="card metric-card batt-card" id="batt-card-elem">
+                    <div class="card-header">
+                        <span class="card-icon">⚡</span>
+                        <h3>SYSTEM BATT</h3>
+                    </div>
+                    <div class="metric-body">
+                        <span id="battery-val" class="metric-value highlight-amber">0.0</span>
+                        <span class="metric-unit">VOLTS</span>
+                    </div>
+                    <div class="metric-footer">
+                        <span>ALT. CHARGE</span>
+                    </div>
+                </div>
+
+                <!-- Intake MAP Pressure & Injector PW -->
+                <div class="card metric-card map-card">
+                    <div class="card-header">
+                        <span class="card-icon">💨</span>
+                        <h3>MANIFOLD PRESS</h3>
+                    </div>
+                    <div class="metric-body">
+                        <span id="map-val" class="metric-value">0.0</span>
+                        <span class="metric-unit">kPa</span>
+                    </div>
+                    <div class="metric-sub">
+                        <span>PULSE: <strong id="injector-val">0.00</strong> ms</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Engine Hours & Warning Status Bar -->
+            <div class="card status-bar-card">
+                <div class="hours-display">
+                    <span class="hours-label">TOTAL ENGINE HOURS:</span>
+                    <span id="engine-hours-val" class="hours-val">0.0 HRS</span>
+                </div>
+
+                <div class="diagnostics-indicators">
+                    <span id="flag-oil" class="diag-flag">OIL OK</span>
+                    <span id="flag-temp" class="diag-flag">TEMP OK</span>
+                    <span id="flag-check" class="diag-flag">CHECK ENG</span>
+                    <span id="flag-batt" class="diag-flag">BATT OK</span>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Column 3: Live Historical Trend Chart -->
+        <section class="card chart-card">
+            <div class="card-header">
+                <h2>LIVE PERFORMANCE TRENDS</h2>
+                <div class="chart-legend">
+                    <span class="legend-item cyan-legend">RPM</span>
+                    <span class="legend-item amber-legend">FUEL (L/h)</span>
+                </div>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
