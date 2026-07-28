@@ -152,18 +152,23 @@
                                 </div>
                             </div>
 
-                            <!-- Card 4: Fuel Flow Rate -->
+                            <!-- Card 4: Fuel Flow & Fuel Tank Level -->
                             <div class="card metric-card fuel-card">
                                 <div class="card-header">
                                     <span class="card-icon">⛽</span>
-                                    <h3>FUEL FLOW</h3>
+                                    <h3>FUEL & TANK</h3>
                                 </div>
                                 <div class="metric-body">
                                     <span id="fuel-rate-val" class="metric-value highlight-cyan">0.00</span>
                                     <span class="metric-unit">L/h</span>
                                 </div>
-                                <div class="metric-footer">
-                                    <span>PULSE: <strong id="injector-val">0.00 ms</strong></span>
+                                <div class="tank-mini-block">
+                                    <div class="tank-bar-track">
+                                        <div id="tank-fill-mini" class="tank-bar-fill" style="width: 100%;"></div>
+                                    </div>
+                                    <div class="metric-footer">
+                                        <span>TANK: <strong id="tank-liters-mini">170 L</strong> (<strong id="tank-pct-mini">100%</strong>)</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -187,7 +192,7 @@
             <!-- PAGE 2: ENGINE PERFORMANCE TRENDS (GRAPHS) -->
             <section class="dashboard-page page-graphs" id="page-2">
                 <div class="graphs-page-layout">
-                    <!-- Graph 1: Engine Speed RPM & Fuel Flow Rate -->
+                    <!-- Graph 1: Engine Speed RPM & Fuel Flow -->
                     <div class="card chart-card chart-half">
                         <div class="card-header">
                             <h2>ENGINE SPEED & FUEL FLOW TRENDS</h2>
@@ -250,6 +255,91 @@
                 </div>
             </section>
 
+            <!-- PAGE 4: FUEL TANK MANAGEMENT & FILL-UP CONFIGURATION -->
+            <section class="dashboard-page page-fuel" id="page-4">
+                <div class="fuel-page-layout">
+                    <div class="card fuel-config-card">
+                        <div class="card-header">
+                            <h2>⛽ FUEL TANK MANAGEMENT</h2>
+                            <span class="capacity-tag">CAPACITY: 170 LITERS</span>
+                        </div>
+
+                        <div class="fuel-display-grid">
+                            <!-- Visual Fuel Tank Level Gauge Bar -->
+                            <div class="tank-gauge-section">
+                                <div class="tank-gauge-track-large">
+                                    <div id="tank-fill-large" class="tank-gauge-fill-large" style="height: 100%;"></div>
+                                    <div class="tank-gauge-markers">
+                                        <span>170L (F)</span>
+                                        <span>127L (3/4)</span>
+                                        <span>85L (1/2)</span>
+                                        <span>42L (1/4)</span>
+                                        <span>0L (E)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Digital Stat Indicators -->
+                            <div class="fuel-stats-section">
+                                <div class="fuel-stat-card">
+                                    <span class="stat-label">REMAINING FUEL</span>
+                                    <div class="stat-value-group">
+                                        <span id="fuel-remaining-liters" class="digital-huge highlight-cyan">170</span>
+                                        <span class="digital-unit">/ 170 L</span>
+                                    </div>
+                                </div>
+
+                                <div class="fuel-stat-card">
+                                    <span class="stat-label">TANK LEVEL</span>
+                                    <div class="stat-value-group">
+                                        <span id="fuel-remaining-pct" class="digital-huge highlight-amber">100</span>
+                                        <span class="digital-unit">%</span>
+                                    </div>
+                                </div>
+
+                                <div class="fuel-stat-card">
+                                    <span class="stat-label">EST. RANGE TIME</span>
+                                    <div class="stat-value-group">
+                                        <span id="fuel-range-hours" class="digital-large highlight-green">--</span>
+                                        <span class="digital-unit">HOURS</span>
+                                    </div>
+                                </div>
+
+                                <div class="fuel-stat-card">
+                                    <span class="stat-label">TRIP CONSUMED</span>
+                                    <div class="stat-value-group">
+                                        <span id="trip-consumed-val" class="digital-large">0.0</span>
+                                        <span class="digital-unit">LITERS</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Touch Adjustment Controls Row -->
+                        <div class="fuel-controls-section">
+                            <div class="fuel-adjust-panel">
+                                <span class="controls-label">QUICK LEVEL ADJUSTMENT:</span>
+                                <div class="fuel-btn-group">
+                                    <button class="fuel-adj-btn btn-minus" onclick="adjustFuelLevel(-20)">- 20 L</button>
+                                    <button class="fuel-adj-btn btn-minus" onclick="adjustFuelLevel(-1)">- 1 L</button>
+                                    <button class="fuel-adj-btn btn-plus" onclick="adjustFuelLevel(1)">+ 1 L</button>
+                                    <button class="fuel-adj-btn btn-plus" onclick="adjustFuelLevel(20)">+ 20 L</button>
+                                </div>
+                            </div>
+
+                            <div class="fuel-actions-panel">
+                                <button class="fuel-action-btn fill-full-btn" onclick="fillTankFull()">
+                                    ⛽ FILL TANK FULL (170 L)
+                                </button>
+                                <button class="fuel-action-btn reset-trip-btn" onclick="resetTripConsumed()">
+                                    🔄 RESET TRIP CONSUMED
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </div>
     </div>
 
@@ -269,6 +359,11 @@
             <span class="nav-icon">🌡️</span>
             <span class="nav-label">THERMAL & POWER</span>
             <span class="nav-key">[F3]</span>
+        </button>
+        <button id="nav-btn-4" class="nav-tab" onclick="switchDashboardPage(4)">
+            <span class="nav-icon">⛽</span>
+            <span class="nav-label">FUEL TANK</span>
+            <span class="nav-key">[F4]</span>
         </button>
     </nav>
 

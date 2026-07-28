@@ -268,22 +268,15 @@ body.helm-theme {
 
 .page-slider {
     display: flex;
-    width: 2400px; /* 3 x 800px pages */
+    width: 3200px; /* 4 x 800px pages */
     height: 396px;
     transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.page-slider.active-page-1 {
-    transform: translateX(0px);
-}
-
-.page-slider.active-page-2 {
-    transform: translateX(-800px);
-}
-
-.page-slider.active-page-3 {
-    transform: translateX(-1600px);
-}
+.page-slider.active-page-1 { transform: translateX(0px); }
+.page-slider.active-page-2 { transform: translateX(-800px); }
+.page-slider.active-page-3 { transform: translateX(-1600px); }
+.page-slider.active-page-4 { transform: translateX(-2400px); }
 
 .dashboard-page {
     width: 800px;
@@ -412,7 +405,6 @@ body.helm-theme {
     background: rgba(255, 255, 255, 0.08);
     border-radius: 5px;
     overflow: hidden;
-
 }
 
 .tps-fill {
@@ -482,12 +474,12 @@ body.helm-theme {
     display: flex;
     align-items: baseline;
     gap: 6px;
-    margin: 4px 0;
+    margin: 2px 0;
 }
 
 .metric-value {
     font-family: var(--font-heading);
-    font-size: 2.2rem;
+    font-size: 2.1rem;
     font-weight: 900;
     color: #ffffff;
     line-height: 1;
@@ -509,11 +501,34 @@ body.helm-theme {
     font-weight: 700;
 }
 
+/* Tank Mini Progress Bar on Page 1 */
+.tank-mini-block {
+    margin-top: 4px;
+}
+
+.tank-bar-track {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.tank-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.tank-bar-fill.warning-fill {
+    background: linear-gradient(90deg, var(--accent-amber), var(--accent-red));
+}
+
 .metric-footer {
     font-size: 0.62rem;
     color: var(--text-muted);
     font-family: var(--font-digital);
-
 }
 
 .metric-footer strong {
@@ -601,19 +616,6 @@ body.helm-theme {
     letter-spacing: 0.5px;
 }
 
-.chart-legend-tag {
-    font-size: 0.62rem;
-    font-family: var(--font-digital);
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-
-.cyan-tag {
-    background: rgba(0, 229, 255, 0.15);
-    color: var(--accent-cyan);
-}
-
 .chart-legend {
     display: flex;
     gap: 10px;
@@ -650,7 +652,237 @@ body.helm-theme {
 }
 
 /* ==========================================================================
-   6. BOTTOM TOUCH NAVIGATION BAR (48px Height)
+   6. PAGE 4: FUEL TANK MANAGEMENT & CONTROL CENTER
+   ========================================================================== */
+
+.fuel-page-layout {
+    height: 380px;
+}
+
+.fuel-config-card {
+    height: 380px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 12px;
+}
+
+.capacity-tag {
+    font-family: var(--font-digital);
+    font-size: 0.7rem;
+    color: var(--accent-cyan);
+    background: rgba(0, 229, 255, 0.1);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 229, 255, 0.3);
+}
+
+.fuel-display-grid {
+    display: flex;
+    gap: 16px;
+    height: 220px;
+    margin: 8px 0;
+}
+
+/* Vertical Fuel Tank Level Gauge Bar */
+.tank-gauge-section {
+    width: 140px;
+    height: 220px;
+    display: flex;
+    justify-content: center;
+}
+
+.tank-gauge-track-large {
+    width: 60px;
+    height: 220px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(0, 229, 255, 0.3);
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+.tank-gauge-fill-large {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(0deg, var(--accent-cyan), var(--accent-green));
+    border-radius: 0 0 8px 8px;
+    transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+}
+
+.tank-gauge-fill-large.warning-fill {
+    background: linear-gradient(0deg, var(--accent-red), var(--accent-amber));
+    box-shadow: 0 0 15px rgba(255, 23, 68, 0.6);
+}
+
+.tank-gauge-markers {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 4px 6px;
+    pointer-events: none;
+}
+
+.tank-gauge-markers span {
+    font-family: var(--font-digital);
+    font-size: 0.58rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.7);
+    text-shadow: 0 0 4px #000;
+}
+
+/* Digital Stat Cards on Fuel Page */
+.fuel-stats-section {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+}
+
+.fuel-stat-card {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.stat-label {
+    font-family: var(--font-heading);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.stat-value-group {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.digital-large {
+    font-family: var(--font-heading);
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #ffffff;
+}
+
+.digital-large.highlight-green {
+    color: var(--accent-green);
+}
+
+/* Controls & Action Buttons */
+.fuel-controls-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 229, 255, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+.fuel-adjust-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.controls-label {
+    font-family: var(--font-heading);
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.fuel-btn-group {
+    display: flex;
+    gap: 8px;
+}
+
+.fuel-adj-btn {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 900;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 70px;
+    border: 1px solid transparent;
+}
+
+.fuel-adj-btn:active {
+    transform: scale(0.92);
+}
+
+.btn-minus {
+    background: rgba(255, 23, 68, 0.15);
+    border-color: rgba(255, 23, 68, 0.4);
+    color: var(--accent-red);
+}
+
+.btn-minus:active {
+    background: var(--accent-red);
+    color: #ffffff;
+}
+
+.btn-plus {
+    background: rgba(0, 230, 118, 0.15);
+    border-color: rgba(0, 230, 118, 0.4);
+    color: var(--accent-green);
+}
+
+.btn-plus:active {
+    background: var(--accent-green);
+    color: #000000;
+}
+
+.fuel-actions-panel {
+    display: flex;
+    gap: 12px;
+}
+
+.fuel-action-btn {
+    flex: 1;
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 900;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.fuel-action-btn:active {
+    transform: scale(0.96);
+}
+
+.fill-full-btn {
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+    color: #000000;
+    border: none;
+    box-shadow: var(--glow-cyan);
+}
+
+.reset-trip-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   7. BOTTOM TOUCH NAVIGATION BAR (48px Height)
    ========================================================================== */
 
 .helm-nav-bar {
@@ -669,13 +901,13 @@ body.helm-theme {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     background: transparent;
     border: none;
     border-bottom: 3px solid transparent;
     color: var(--text-secondary);
     font-family: var(--font-heading);
-    font-size: 0.8rem;
+    font-size: 0.76rem;
     font-weight: 800;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -694,7 +926,7 @@ body.helm-theme {
 }
 
 .nav-icon {
-    font-size: 1rem;
+    font-size: 0.95rem;
 }
 
 .nav-label {
@@ -703,7 +935,7 @@ body.helm-theme {
 
 .nav-key {
     font-family: var(--font-digital);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--accent-cyan);
     opacity: 0.7;
     margin-left: 2px;

@@ -1,9 +1,13 @@
 /**
  * Yamaha YDS Real-Time Telemetry Dashboard Frontend Engine.
  * Multi-Page Kiosk Architecture (800x480 resolution optimized for Raspberry Pi Touchscreen).
+ * Includes SQLite Fuel Tank Management, Real-Time Consumption Tracking, and Dual-Axis Charting.
  */
 
 let switchDashboardPage = function () { };
+let adjustFuelLevel = function () { };
+let fillTankFull = function () { };
+let resetTripConsumed = function () { };
 
 document.addEventListener("DOMContentLoaded", () => {
     // --- State Variables ---
@@ -13,6 +17,11 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentLatency = 0;
     let activePage = 1;
     let useFahrenheit = false;
+
+    // Local Fuel State Fallback (Synced continuously with SQLite API)
+    let fuelRemainingLiters = 170.0;
+    let tankCapacityLiters = 170.0;
+    let tripConsumedLiters = 0.0;
 
     // History data arrays (max 40 points ~8 seconds of continuous telemetry history)
     const MAX_HISTORY = 40;
@@ -31,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const navBtn1 = document.getElementById("nav-btn-1");
     const navBtn2 = document.getElementById("nav-btn-2");
     const navBtn3 = document.getElementById("nav-btn-3");
+    const navBtn4 = document.getElementById("nav-btn-4");
 
     const connBadge = document.getElementById("connection-badge");
     const connDot = document.getElementById("conn-dot");
@@ -66,6 +76,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const flagBatt = document.getElementById("flag-batt");
     const flagIsc = document.getElementById("flag-isc");
 
+    // Page 1 Mini Tank Bar Elements
+    const tankFillMini = document.getElementById("tank-fill-mini");
+    const tankLitersMini = document.getElementById("tank-liters-mini");
+    const tankPctMini = document.getElementById("tank-pct-mini");
+
+    // Page 4 Fuel Config Elements
+    const tankFillLarge = document.getElementById("tank-fill-large");
+    const fuelRemainingLitersElem = document.getElementById("fuel-remaining-liters");
+    const fuelRemainingPctElem = document.getElementById("fuel-remaining-pct");
+    const fuelRangeHoursElem = document.getElementById("fuel-range-hours");
+    const tripConsumedValElem = document.getElementById("trip-consumed-val");
+
     // --- Restore User Preferences ---
     const savedUnit = localStorage.getItem("yamaha_temp_unit");
     if (savedUnit === "F") {
@@ -80,17 +102,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Page Switcher ---
     switchDashboardPage = function (pageNum) {
-        if (pageNum < 1 || pageNum > 3) return;
+        if (pageNum < 1 || pageNum > 4) return;
         activePage = pageNum;
         localStorage.setItem("yamaha_kiosk_page", pageNum);
 
         pageSlider.className = `page-slider active-page-${pageNum}`;
 
-        [navBtn1, navBtn2, navBtn3].forEach((btn, idx) => {
-            if (idx + 1 === pageNum) {
-                btn.classList.add("active");
-            } else {
-                btn.classList.remove("active");
+        [navBtn1, navBtn2, navBtn3, navBtn4].forEach((btn, idx) => {
+            if (btn) {
+                if (idx + 1 === pageNum) {
+                    btn.classList.add("active");
+                } else {
+                    btn.classList.remove("active");
+                }
             }
         });
     };
@@ -109,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const diffX = e.changedTouches[0].screenX - touchStartX;
         const diffY = e.changedTouches[0].screenY - touchStartY;
         if (Math.abs(diffX) > 60 && Math.abs(diffY) < 50) {
-            if (diffX < 0 && activePage < 3) {
+            if (diffX < 0 && activePage < 4) {
                 switchDashboardPage(activePage + 1);
             } else if (diffX > 0 && activePage > 1) {
                 switchDashboardPage(activePage - 1);
@@ -117,7 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }, false);
 
-    // Keyboard Hotkey Navigation (F1/F2/F3, 1/2/3, Left/Right Arrow)
+    // Keyboard Hotkey Navigation (F1/F2/F3/F4, 1/2/3/4, Left/Right Arrow)
     document.addEventListener("keydown", (e) => {
         if (e.key === "F1" || e.key === "1") {
             e.preventDefault();
@@ -128,12 +152,15 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (e.key === "F3" || e.key === "3") {
             e.preventDefault();
             switchDashboardPage(3);
+        } else if (e.key === "F4" || e.key === "4") {
+            e.preventDefault();
+            switchDashboardPage(4);
         } else if (e.key === "ArrowLeft") {
             e.preventDefault();
             if (activePage > 1) switchDashboardPage(activePage - 1);
         } else if (e.key === "ArrowRight") {
             e.preventDefault();
-            if (activePage < 3) switchDashboardPage(activePage + 1);
+            if (activePage < 4) switchDashboardPage(activePage + 1);
         }
     });
 
@@ -144,6 +171,92 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("yamaha_temp_unit", useFahrenheit ? "F" : "C");
         if (lastTelemetry) updateUI(lastTelemetry);
     });
+
+    // --- Fuel API Controls (SQLite Persistence) ---
+    adjustFuelLevel = async function (delta) {
+        try {
+            const res = await fetch("/api/fuel/adjust", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ delta: delta })
+            });
+            const data = await res.json();
+            updateFuelDisplay(data);
+        } catch (e) {
+            console.error("Error adjusting fuel level:", e);
+        }
+    };
+
+    fillTankFull = async function () {
+        try {
+            const res = await fetch("/api/fuel/fill", { method: "POST" });
+            const data = await res.json();
+            updateFuelDisplay(data);
+        } catch (e) {
+            console.error("Error filling fuel tank:", e);
+        }
+    };
+
+    resetTripConsumed = async function () {
+        try {
+            const res = await fetch("/api/fuel/reset_trip", { method: "POST" });
+            const data = await res.json();
+            updateFuelDisplay(data);
+        } catch (e) {
+            console.error("Error resetting trip consumed:", e);
+        }
+    };
+
+    function updateFuelDisplay(fuelState) {
+        if (!fuelState) return;
+        fuelRemainingLiters = fuelState.current_fuel_liters || 170.0;
+        tankCapacityLiters = fuelState.tank_capacity_liters || 170.0;
+        tripConsumedLiters = fuelState.trip_consumed_liters || 0.0;
+
+        const pct = Math.max(0, Math.min(100, (fuelRemainingLiters / tankCapacityLiters) * 100));
+
+        // Page 1 Mini Tank Bar
+        if (tankFillMini) {
+            tankFillMini.style.width = `${pct.toFixed(1)}%`;
+            if (pct < 20) {
+                tankFillMini.className = "tank-bar-fill warning-fill";
+            } else {
+                tankFillMini.className = "tank-bar-fill";
+            }
+        }
+        if (tankLitersMini) tankLitersMini.innerText = `${fuelRemainingLiters.toFixed(0)} L`;
+        if (tankPctMini) tankPctMini.innerText = `${pct.toFixed(0)}%`;
+
+        // Page 4 Large Fuel Config Display
+        if (tankFillLarge) {
+            tankFillLarge.style.height = `${pct.toFixed(1)}%`;
+            if (pct < 20) {
+                tankFillLarge.className = "tank-gauge-fill-large warning-fill";
+            } else {
+                tankFillLarge.className = "tank-gauge-fill-large";
+            }
+        }
+        if (fuelRemainingLitersElem) fuelRemainingLitersElem.innerText = fuelRemainingLiters.toFixed(1);
+        if (fuelRemainingPctElem) fuelRemainingPctElem.innerText = pct.toFixed(0);
+        if (tripConsumedValElem) tripConsumedValElem.innerText = tripConsumedLiters.toFixed(1);
+
+        // Est. Range Hours
+        if (fuelRangeHoursElem) {
+            const flowRate = (lastTelemetry && lastTelemetry.fuel_rate_lh) ? lastTelemetry.fuel_rate_lh : 0;
+            if (flowRate > 0.5) {
+                const rangeHrs = fuelRemainingLiters / flowRate;
+                fuelRangeHoursElem.innerText = rangeHrs.toFixed(1);
+            } else {
+                fuelRangeHoursElem.innerText = "--";
+            }
+        }
+    }
+
+    // Load initial fuel state from SQLite endpoint
+    fetch("/api/fuel")
+        .then(res => res.json())
+        .then(data => updateFuelDisplay(data))
+        .catch(err => console.debug("Initial fuel state fetch warning:", err));
 
     // --- Canvas Tachometer Setup ---
     const gaugeCanvas = document.getElementById("rpmGaugeCanvas");
@@ -392,9 +505,17 @@ document.addEventListener("DOMContentLoaded", () => {
         mapVal.innerText = (data.map_kpa || 99.09).toFixed(2);
         baroVal.innerText = `${(data.baro_hpa || 990.9).toFixed(1)} hPa`;
 
-        // 6. Fuel Rate & Injector Pulse
+        // 6. Fuel Rate, Injector Pulse & Fuel Tank Sync
         fuelRateVal.innerText = (data.fuel_rate_lh || 0.0).toFixed(2);
         injectorVal.innerText = `${(data.injector_ms || 0.0).toFixed(2)} ms`;
+
+        if (data.current_fuel_liters !== undefined) {
+            updateFuelDisplay({
+                current_fuel_liters: data.current_fuel_liters,
+                tank_capacity_liters: data.tank_capacity_liters || 170.0,
+                trip_consumed_liters: data.trip_consumed_liters || 0.0
+            });
+        }
 
         // 7. Alarms & Status Flags
         const warnings = data.warnings || {};

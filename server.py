@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from yds_reader import YDSReader
+import database
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -29,6 +30,11 @@ active_websockets: Set[WebSocket] = set()
 latest_telemetry: dict = {}
 yds_reader_instance: YDSReader = None
 polling_task: asyncio.Task = None
+
+# Fuel Tracking State
+current_fuel_state: dict = {}
+last_polling_time: float = 0.0
+last_db_log_time: float = 0.0
 
 # System Configuration
 DEFAULT_SERIAL_PORT = os.getenv("YDS_PORT", "/dev/ttyUSB0")
@@ -50,21 +56,51 @@ cli_args, _ = parser.parse_known_args()
 
 async def telemetry_background_loop():
     """
-    Asynchronous background loop polling ECU telemetry at 5 Hz (every 200ms)
-    and broadcasting JSON updates to all connected WebSocket clients.
+    Asynchronous background loop polling ECU telemetry at 5 Hz (every 200ms),
+    calculating fuel consumption, logging frames to SQLite, and broadcasting updates.
     """
-    global latest_telemetry, active_websockets, yds_reader_instance
+    global latest_telemetry, active_websockets, yds_reader_instance, current_fuel_state, last_polling_time, last_db_log_time
     logger.info("Starting background YDS polling loop (5 Hz)...")
 
     # Connect to serial port / init reader
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, yds_reader_instance.connect)
 
+    last_polling_time = time.time()
+    last_db_log_time = time.time()
+
     while True:
         try:
+            now = time.time()
+            dt = max(0.05, min(1.0, now - last_polling_time))
+            last_polling_time = now
+
             # Execute serial read in thread pool to prevent blocking asyncio loop
             data = await loop.run_in_executor(None, yds_reader_instance.read_telemetry)
+
+            # Calculate real-time fuel consumption if running
+            if data and data.get("status") == "ok":
+                fuel_rate_lh = float(data.get("fuel_rate_lh", 0.0))
+                if fuel_rate_lh > 0.0:
+                    consumed_delta = (fuel_rate_lh * dt) / 3600.0
+                    new_rem = max(0.0, current_fuel_state["current_fuel_liters"] - consumed_delta)
+                    new_trip = current_fuel_state["trip_consumed_liters"] + consumed_delta
+                    current_fuel_state = database.update_fuel_state(new_rem, trip_consumed=new_trip)
+
+            # Attach fuel state to telemetry packet
+            data.update({
+                "current_fuel_liters": current_fuel_state["current_fuel_liters"],
+                "tank_capacity_liters": current_fuel_state["tank_capacity_liters"],
+                "trip_consumed_liters": current_fuel_state["trip_consumed_liters"],
+                "fuel_percent": current_fuel_state["fuel_percent"]
+            })
+
             latest_telemetry = data
+
+            # Log to SQLite database history every 1.0 second
+            if (now - last_db_log_time) >= 1.0:
+                last_db_log_time = now
+                await loop.run_in_executor(None, database.log_telemetry_frame, data)
 
             # Broadcast to active WebSocket connections
             if active_websockets:
@@ -94,9 +130,13 @@ async def telemetry_background_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager for starting and stopping background tasks."""
-    global yds_reader_instance, polling_task
-    logger.info("Initializing YDS Telemetry Backend...")
+    """Lifespan context manager for starting SQLite DB and background tasks."""
+    global yds_reader_instance, polling_task, current_fuel_state
+    logger.info("Initializing YDS Telemetry Backend & SQLite Database...")
+
+    # Initialize SQLite Database
+    database.init_db()
+    current_fuel_state = database.get_fuel_state()
 
     # Instantiate YDS Reader
     yds_reader_instance = YDSReader(
@@ -125,7 +165,7 @@ async def lifespan(app: FastAPI):
 # Initialize FastAPI Application
 app = FastAPI(
     title="Yamaha YDS Telemetry Engine",
-    description="Real-time telemetry WebSocket server for Yamaha F150 outboard ECU 63P-01",
+    description="Real-time telemetry WebSocket server with SQLite fuel logging for Yamaha F150",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -140,8 +180,53 @@ async def get_system_status():
         "serial_port": cli_args.serial_port,
         "baud_rate": cli_args.baud,
         "active_clients": len(active_websockets),
+        "fuel_state": current_fuel_state,
         "latest_telemetry": latest_telemetry
     })
+
+
+# Fuel REST API Endpoints
+@app.get("/api/fuel")
+async def get_fuel_endpoint():
+    """Returns current fuel tank level and trip consumption from SQLite."""
+    global current_fuel_state
+    current_fuel_state = database.get_fuel_state()
+    return JSONResponse(current_fuel_state)
+
+
+@app.post("/api/fuel/adjust")
+async def adjust_fuel_endpoint(payload: dict):
+    """Adjusts current fuel level by delta liters (+1, -1, +20, -20) in SQLite."""
+    global current_fuel_state
+    delta = float(payload.get("delta", 0.0))
+    current_fuel_state = database.adjust_fuel_level(delta)
+    logger.info(f"Adjusted fuel level by {delta}L -> New Level: {current_fuel_state['current_fuel_liters']}L")
+    return JSONResponse(current_fuel_state)
+
+
+@app.post("/api/fuel/fill")
+async def fill_fuel_endpoint():
+    """Resets fuel tank level to 170.0L full capacity in SQLite."""
+    global current_fuel_state
+    current_fuel_state = database.fill_tank_full(170.0)
+    logger.info(f"Filled fuel tank to FULL (170.0L)")
+    return JSONResponse(current_fuel_state)
+
+
+@app.post("/api/fuel/reset_trip")
+async def reset_trip_endpoint():
+    """Resets trip consumed fuel counter to 0.0 in SQLite."""
+    global current_fuel_state
+    current_fuel_state = database.reset_trip_consumed()
+    logger.info("Reset trip fuel consumption counter")
+    return JSONResponse(current_fuel_state)
+
+
+@app.get("/api/history")
+async def get_history_endpoint(limit: int = 100):
+    """Retrieves recent telemetry history frames from SQLite."""
+    history = database.get_history(limit=limit)
+    return JSONResponse({"count": len(history), "history": history})
 
 
 # WebSocket Endpoint for Live Telemetry Stream
