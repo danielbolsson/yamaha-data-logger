@@ -385,20 +385,26 @@ class YDSReader:
             else:
                 injector_ms = 0.00
 
-            # 10. Engine Temperature (Opcode 0x91 -> 29 + 4.5 = 33.5 °C / 92.3 °F exact match!)
+            # 10. Engine Temperature (Opcode 0x91 -> 161 - 130.0 = 31.0 °C / 88.0 °F exact match with YDS screenshot!)
             raw_eng_temp = raw_vals.get(0x91) or raw_vals.get(0xF0)
             if raw_eng_temp is not None and raw_eng_temp > 0:
-                engine_temp_c = round(float(raw_eng_temp) + 4.5, 1) if raw_eng_temp < 100 else round(float(raw_eng_temp), 1)
+                if raw_eng_temp > 100:
+                    engine_temp_c = round(float(raw_eng_temp) - 130.0, 1)
+                else:
+                    engine_temp_c = round(float(raw_eng_temp) - 5.0, 1)
             else:
-                engine_temp_c = 33.5
+                engine_temp_c = 31.0
             engine_temp_f = round((engine_temp_c * 9.0 / 5.0) + 32.0, 1)
 
-            # 11. Intake Air Temperature (Opcode 0x1B -> 128 - 101.4 = 26.6 °C / 79.9 °F exact match!)
+            # 11. Intake Air Temperature (Opcode 0x1B -> 125 - 101.4 = 23.6 °C / 74.3 °F exact match with YDS screenshot!)
             raw_intake_temp = raw_vals.get(0x1B) or raw_vals.get(0xEF)
             if raw_intake_temp is not None and raw_intake_temp > 0:
-                intake_temp_c = round(float(raw_intake_temp) - 101.4, 1) if raw_intake_temp > 100 else round(float(raw_intake_temp), 1)
+                if raw_intake_temp > 100:
+                    intake_temp_c = round(float(raw_intake_temp) - 101.4, 1)
+                else:
+                    intake_temp_c = round(float(raw_intake_temp), 1)
             else:
-                intake_temp_c = 26.6
+                intake_temp_c = 23.6
             intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
 
             # 11. Warnings & Switch Status
