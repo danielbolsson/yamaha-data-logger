@@ -187,11 +187,14 @@
             <!-- PAGE 2: ENGINE PERFORMANCE TRENDS (GRAPHS) -->
             <section class="dashboard-page page-graphs" id="page-2">
                 <div class="graphs-page-layout">
-                    <!-- Graph 1: Engine Speed RPM -->
+                    <!-- Graph 1: Engine Speed RPM & Fuel Flow Rate -->
                     <div class="card chart-card chart-half">
                         <div class="card-header">
-                            <h2>ENGINE SPEED (RPM) HISTORY</h2>
-                            <span class="chart-legend-tag cyan-tag">0 - 6000 RPM</span>
+                            <h2>ENGINE SPEED & FUEL FLOW TRENDS</h2>
+                            <div class="chart-legend">
+                                <span class="legend-item cyan-legend">RPM</span>
+                                <span class="legend-item amber-legend">FUEL (L/h)</span>
+                            </div>
                         </div>
                         <div class="chart-wrapper">
                             <canvas id="rpmChartCanvas"></canvas>

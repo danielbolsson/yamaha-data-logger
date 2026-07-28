@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const MAX_HISTORY = 40;
     const timeLabels = [];
     const rpmHistory = [];
+    const fuelHistory = [];
     const mapHistory = [];
     const tpsHistory = [];
     const engTempHistory = [];
@@ -244,23 +245,25 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // Page 2 - RPM Chart
+    // Page 2 - RPM & Fuel Flow Dual-Axis Chart
     const rpmChartCtx = document.getElementById("rpmChartCanvas").getContext("2d");
     const rpmChart = new Chart(rpmChartCtx, {
         type: "line",
         data: {
             labels: timeLabels,
-            datasets: [{
-                data: rpmHistory,
-                borderColor: "#00e5ff",
-                borderWidth: 2,
-                backgroundColor: "rgba(0, 229, 255, 0.1)",
-                fill: true,
-                pointRadius: 0,
-                tension: 0.2
-            }]
+            datasets: [
+                { label: "RPM", data: rpmHistory, borderColor: "#00e5ff", borderWidth: 2, pointRadius: 0, tension: 0.2, yAxisID: "y" },
+                { label: "Fuel (L/h)", data: fuelHistory, borderColor: "#ffb700", borderWidth: 2, pointRadius: 0, tension: 0.2, yAxisID: "y1" }
+            ]
         },
-        options: { ...chartDefaultOptions, scales: { ...chartDefaultOptions.scales, y: { min: 0, max: 6000, ticks: { color: "#8a9bb0", font: { size: 9 } } } } }
+        options: {
+            ...chartDefaultOptions,
+            scales: {
+                x: { ticks: { display: false } },
+                y: { type: "linear", display: true, position: "left", min: 0, max: 6000, ticks: { color: "#00e5ff", font: { size: 8 } } },
+                y1: { type: "linear", display: true, position: "right", min: 0, max: 60, grid: { drawOnChartArea: false }, ticks: { color: "#ffb700", font: { size: 8 } } }
+            }
+        }
     });
 
     // Page 2 - MAP & TPS Chart
@@ -419,6 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         timeLabels.push(nowStr);
         rpmHistory.push(rpm);
+        fuelHistory.push(data.fuel_rate_lh || 0.0);
         mapHistory.push(data.map_kpa || 99.09);
         tpsHistory.push(tps);
         engTempHistory.push(useFahrenheit ? tempF : tempC);
@@ -429,6 +433,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (timeLabels.length > MAX_HISTORY) {
             timeLabels.shift();
             rpmHistory.shift();
+            fuelHistory.shift();
             mapHistory.shift();
             tpsHistory.shift();
             engTempHistory.shift();
