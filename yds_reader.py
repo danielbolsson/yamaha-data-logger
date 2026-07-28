@@ -573,8 +573,13 @@ if __name__ == "__main__":
     try:
         while True:
             data = reader.read_telemetry()
-            print(f"\rRPM: {data['rpm']} r/min | Hours: {data['engine_hours']} HRS | "
-                  f"TPS: {data['tps_percent']}% ({data['tps_volts']}V) | MAP: {data['map_kpa']} kPa", end="")
+            print(f"\rRPM: {data.get('rpm', 0):.0f} r/min | "
+                  f"Batt: {data.get('battery_voltage', 0):.2f}V | "
+                  f"MAP: {data.get('map_kpa', 0):.1f} kPa | "
+                  f"Temp: {data.get('engine_temp_c', 0):.1f}°C | "
+                  f"Oil: {data.get('oil_pressure_kpa', 0):.1f} kPa | "
+                  f"Fuel: {data.get('fuel_rate_lh', 0):.2f} L/h | "
+                  f"Hours: {data.get('engine_hours', 0):.1f} HRS", end="")
             time.sleep(0.2)
     except KeyboardInterrupt:
         print("\nStopping reader.")
