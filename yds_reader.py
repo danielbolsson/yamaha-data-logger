@@ -366,7 +366,7 @@ class YDSReader:
             raw_batt = (h_batt << 8) | l_batt
 
             if raw_batt > 0:
-                battery_voltage = round(raw_batt / 54.69, 2)
+                battery_voltage = round(raw_batt / 27.05, 2)
             else:
                 raw_batt_v = raw_vals.get(0x1D)
                 if raw_batt_v is not None and raw_batt_v > 0:

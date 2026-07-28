@@ -226,7 +226,18 @@ class GPSReader:
             except ValueError:
                 pass
 
-        # 3. VTG Sentence: Track Made Good and Ground Speed
+        # 3. GSV Sentence: Satellites in View
+        # $GPGSV,2,1,08,01,40,083,46,02,17,308,38,...*hh
+        elif cmd.endswith("GSV") and len(tokens) >= 4:
+            try:
+                if tokens[3]:
+                    sats_in_view = int(tokens[3])
+                    if sats_in_view > self.satellites or self.fix_quality == 0:
+                        self.satellites = sats_in_view
+            except ValueError:
+                pass
+
+        # 4. VTG Sentence: Track Made Good and Ground Speed
         # $GPVTG,x.x,T,x.x,M,x.x,N,x.x,K*hh
         elif cmd.endswith("VTG") and len(tokens) >= 8:
             if tokens[5] and tokens[6] == 'N':
