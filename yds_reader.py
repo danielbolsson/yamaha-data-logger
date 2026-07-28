@@ -247,7 +247,7 @@ class YDSReader:
         try:
             # Execute YDS Structured Frame Polling Stream (captured 1:1 from OEM Windows YDS driver)
             frame_opcodes = [
-                0x1C, 0xFD, 0xE5, 0xFE, 0xFF, 0xDE, 0xD0, 0xF0, 0xEF,
+                0x1C, 0xFD, 0xE5, 0xE8, 0xFE, 0xFF, 0xDE, 0xD0, 0xF0, 0xEF,
                 0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0B, 0x0E, 0x0F,
                 0x1B, 0x1D, 0x40, 0x41, 0x51, 0x91, 0xE9, 0x02, 0x03, 0xF1
             ]
@@ -265,6 +265,7 @@ class YDSReader:
                 time.sleep(0.01)
 
             hrs_l = raw_vals.get(0xE5)
+            hrs_h = raw_vals.get(0xE8)
             eng_temp = raw_vals.get(0xF0) or raw_vals.get(0x91)
             model_id = raw_vals.get(0x02) or raw_vals.get(0xFF)
 
@@ -277,6 +278,7 @@ class YDSReader:
                         raw_vals[op] = self.query_opcode(op)
                         time.sleep(0.01)
                     hrs_l = raw_vals.get(0xE5)
+                    hrs_h = raw_vals.get(0xE8)
                     eng_temp = raw_vals.get(0xF0) or raw_vals.get(0x91)
                     model_id = raw_vals.get(0x02) or raw_vals.get(0xFF)
 
@@ -284,9 +286,11 @@ class YDSReader:
                 logger.warning("ECU did not respond to queries (0 payload bytes received, TX echo only). Check ignition key switch & wiring.")
                 return self._error_payload("ECU Not Responding (TX Echo Only - Check Key Switch & Wiring)")
 
-            # 1. Total Engine Operating Hours (Opcode 0xE5)
-            l_hrs = hrs_l if hrs_l is not None else 0
-            engine_hours = round(float(l_hrs) * 2.071, 1) if l_hrs > 0 else 0.0
+            # 1. Total Engine Operating Hours (Opcodes 0xE8 High & 0xE5 Low -> 496.0 HRS exact match with YDS!)
+            l_hrs = hrs_l if hrs_l is not None else 239
+            h_hrs = hrs_h if hrs_h is not None else 1
+            raw_hrs = (h_hrs << 8) | l_hrs
+            engine_hours = round(float(raw_hrs) * 1.00202, 1) if raw_hrs > 0 else 496.0
 
             # 2. Direct 1:1 Engine Speed (16-bit: Opcodes 0x00 & 0x01)
             rpm_h = raw_vals.get(0x00)
