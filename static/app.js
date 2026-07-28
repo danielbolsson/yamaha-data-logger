@@ -502,12 +502,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // 5. Intake MAP Pressure & Baro
-        mapVal.innerText = (data.map_kpa || 99.09).toFixed(2);
-        baroVal.innerText = `${(data.baro_hpa || 990.9).toFixed(1)} hPa`;
+        if (mapVal) mapVal.innerText = (data.map_kpa || 99.09).toFixed(2);
+        if (baroVal) baroVal.innerText = `${(data.baro_hpa || 990.9).toFixed(1)} hPa`;
 
         // 6. Fuel Rate, Injector Pulse & Fuel Tank Sync
-        fuelRateVal.innerText = (data.fuel_rate_lh || 0.0).toFixed(2);
-        injectorVal.innerText = `${(data.injector_ms || 0.0).toFixed(2)} ms`;
+        if (fuelRateVal) fuelRateVal.innerText = (data.fuel_rate_lh || 0.0).toFixed(2);
+        if (injectorVal) injectorVal.innerText = `${(data.injector_ms || 0.0).toFixed(2)} ms`;
 
         if (data.current_fuel_liters !== undefined) {
             updateFuelDisplay({
