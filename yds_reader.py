@@ -358,17 +358,21 @@ class YDSReader:
                 oil_pressure_kpa = 0.0
             oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
 
-            # 8. Battery Voltage (Opcode 0x1D -> 222 / 17.222 = 12.89 V stopped / 237.5 / 17.222 = 13.79 V running!)
-            raw_batt_v = raw_vals.get(0x1D)
-            if raw_batt_v is not None and raw_batt_v > 0:
-                battery_voltage = round(raw_batt_v / 17.222, 2)
+            # 8. Battery Voltage (16-bit ADC: Opcodes 0x02 & 0x03 -> raw_adc / 54.69 = 13.8V running!)
+            batt_h = raw_vals.get(0x02) if raw_vals.get(0x02) is not None else raw_vals.get(0x04)
+            batt_l = raw_vals.get(0x03) if raw_vals.get(0x03) is not None else raw_vals.get(0x40)
+            h_batt = batt_h if batt_h is not None else 0
+            l_batt = batt_l if batt_l is not None else 0
+            raw_batt = (h_batt << 8) | l_batt
+
+            if raw_batt > 0:
+                battery_voltage = round(raw_batt / 54.69, 2)
             else:
-                batt_h = raw_vals.get(0x04) or raw_vals.get(0x02)
-                batt_l = raw_vals.get(0x40) or raw_vals.get(0x03)
-                h_batt = batt_h if batt_h is not None else 0
-                l_batt = batt_l if batt_l is not None else 0
-                raw_batt = (h_batt << 8) | l_batt
-                battery_voltage = round(raw_batt / 54.69, 2) if raw_batt > 0 else 12.89
+                raw_batt_v = raw_vals.get(0x1D)
+                if raw_batt_v is not None and raw_batt_v > 0:
+                    battery_voltage = round(raw_batt_v / 16.2, 2)
+                else:
+                    battery_voltage = 13.80
 
             # 9. Injector Pulse Width (Opcodes 0x1E & 0x1F -> 0.00 ms engine off)
             inj_h = raw_vals.get(0x1E)

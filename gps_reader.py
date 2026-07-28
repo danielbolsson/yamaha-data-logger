@@ -151,8 +151,9 @@ class GPSReader:
                     continue
 
                 line = line_bytes.decode('ascii', errors='ignore').strip()
-                if line.startswith('$'):
-                    self.parse_nmea_sentence(line)
+                idx = line.find('$')
+                if idx >= 0:
+                    self.parse_nmea_sentence(line[idx:])
 
             except Exception as e:
                 logger.debug(f"Error reading GPS NMEA line: {e}")
@@ -162,19 +163,13 @@ class GPSReader:
 
     def parse_nmea_sentence(self, sentence: str):
         """Parses standard NMEA 0183 sentences ($GPRMC, $GNRMC, $GPGGA, $GPVTG)."""
-        # Validate Checksum if present (*XX)
+        idx_dollar = sentence.find('$')
+        if idx_dollar >= 0:
+            sentence = sentence[idx_dollar:]
+
+        # Extract sentence data before checksum asterisk
         if '*' in sentence:
             parts = sentence.split('*')
-            main_part = parts[0][1:]  # Strip leading '$'
-            checksum_str = parts[1][:2]
-            try:
-                calc_checksum = 0
-                for char in main_part:
-                    calc_checksum ^= ord(char)
-                if f"{calc_checksum:02X}" != checksum_str.upper():
-                    return
-            except Exception:
-                return
             sentence_data = parts[0]
         else:
             sentence_data = sentence
