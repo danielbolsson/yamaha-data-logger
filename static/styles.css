@@ -941,3 +941,114 @@ body.helm-theme {
     opacity: 0.7;
     margin-left: 2px;
 }
+
+/* Exit Kiosk Button in Header */
+.ctrl-btn.exit-btn {
+    background: rgba(255, 23, 68, 0.2);
+    border: 1px solid rgba(255, 23, 68, 0.6);
+    color: #ffffff;
+    font-size: 0.68rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ctrl-btn.exit-btn:active {
+    background: var(--accent-red);
+    transform: scale(0.94);
+}
+
+/* Exit Kiosk Touch Modal Dialog */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeInModal 0.2s ease-out;
+}
+
+.modal-overlay.hidden {
+    display: none;
+}
+
+.modal-box {
+    width: 440px;
+    background: #0d1420;
+    border: 2px solid rgba(255, 23, 68, 0.6);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 0 30px rgba(255, 23, 68, 0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    text-align: center;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.modal-icon {
+    font-size: 1.4rem;
+}
+
+.modal-header h2 {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    color: #ffffff;
+    letter-spacing: 1px;
+}
+
+.modal-text {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.modal-btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.modal-btn {
+    flex: 1;
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 800;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    height: 48px; /* 48px Touch Target */
+    border: none;
+}
+
+.modal-btn:active {
+    transform: scale(0.95);
+}
+
+.cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+}
+
+.confirm-exit-btn {
+    background: linear-gradient(135deg, #b71c1c, #ff1744);
+    color: #ffffff;
+    box-shadow: var(--glow-red);
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}

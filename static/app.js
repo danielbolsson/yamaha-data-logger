@@ -8,6 +8,9 @@ let switchDashboardPage = function () { };
 let adjustFuelLevel = function () { };
 let fillTankFull = function () { };
 let resetTripConsumed = function () { };
+let confirmExitKiosk = function () { };
+let cancelExitKiosk = function () { };
+let executeExitKiosk = function () { };
 
 document.addEventListener("DOMContentLoaded", () => {
     // --- State Variables ---
@@ -171,6 +174,30 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("yamaha_temp_unit", useFahrenheit ? "F" : "C");
         if (lastTelemetry) updateUI(lastTelemetry);
     });
+
+    // --- Exit Kiosk Mode (Return to Pi Desktop) ---
+    const exitModal = document.getElementById("exit-modal");
+
+    confirmExitKiosk = function () {
+        if (exitModal) exitModal.classList.remove("hidden");
+    };
+
+    cancelExitKiosk = function () {
+        if (exitModal) exitModal.classList.add("hidden");
+    };
+
+    executeExitKiosk = async function () {
+        try {
+            if (exitModal) {
+                const modalText = exitModal.querySelector(".modal-text");
+                if (modalText) modalText.innerText = "Closing Chromium kiosk...";
+            }
+            await fetch("/api/kiosk/exit", { method: "POST" });
+            window.close();
+        } catch (e) {
+            console.error("Error executing exit kiosk:", e);
+        }
+    };
 
     // --- Fuel API Controls (SQLite Persistence) ---
     adjustFuelLevel = async function (delta) {

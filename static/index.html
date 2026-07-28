@@ -52,6 +52,11 @@
             <button id="temp-toggle-btn" class="ctrl-btn" title="Toggle °C / °F">
                 °C
             </button>
+
+            <!-- Exit Kiosk / Desktop Button -->
+            <button id="exit-kiosk-btn" class="ctrl-btn exit-btn" title="Exit Kiosk to Desktop" onclick="confirmExitKiosk()">
+                ❌ EXIT
+            </button>
         </div>
     </header>
 
@@ -366,6 +371,21 @@
             <span class="nav-key">[F4]</span>
         </button>
     </nav>
+
+    <!-- Exit Kiosk Touch Confirmation Modal -->
+    <div id="exit-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span class="modal-icon">🚪</span>
+                <h2>EXIT KIOSK MODE?</h2>
+            </div>
+            <p class="modal-text">This will close the Chromium telemetry kiosk browser and return to the Pi desktop.</p>
+            <div class="modal-btn-row">
+                <button class="modal-btn cancel-btn" onclick="cancelExitKiosk()">CANCEL</button>
+                <button class="modal-btn confirm-exit-btn" onclick="executeExitKiosk()">EXIT TO DESKTOP</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/app.js"></script>
 </body>

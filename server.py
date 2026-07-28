@@ -12,6 +12,7 @@ import json
 import asyncio
 import logging
 import argparse
+import subprocess
 from typing import Set
 from contextlib import asynccontextmanager
 
@@ -230,6 +231,19 @@ async def get_history_endpoint(limit: int = 100):
     """Retrieves recent telemetry history frames from SQLite."""
     history = database.get_history(limit=limit)
     return JSONResponse({"count": len(history), "history": history})
+
+
+@app.post("/api/kiosk/exit")
+async def exit_kiosk_endpoint():
+    """Terminates Chromium kiosk browser process on Raspberry Pi to return to desktop."""
+    logger.info("Exit kiosk command triggered via web UI. Terminating Chromium process...")
+    try:
+        # Kill chromium browser instances
+        subprocess.Popen(["pkill", "-f", "chromium"])
+        return JSONResponse({"status": "exiting", "message": "Closing Chromium Kiosk..."})
+    except Exception as e:
+        logger.error(f"Error terminating Chromium process: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 # WebSocket Endpoint for Live Telemetry Stream
