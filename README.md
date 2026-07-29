@@ -317,3 +317,44 @@ $$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \m
 * The Yamaha ECU maintains an internal **45-second diagnostic session watchdog timer**. If no keep-alive command (`0xF1`) is received for 45 seconds, the ECU drops back to non-diagnostic mode.
 * [yds_reader.py](file:///home/daniel/src/yamaha-data-logger/yds_reader.py) automatically handles periodic 8-second keep-alive heartbeats and includes automatic re-activation recovery if the connection is ever interrupted.
 
+---
+
+## 11. Raw Telemetry Logging & Offline Replay System
+
+You can record raw Yamaha ECU opcode responses to a file on your boat or laptop and replay them offline to test and refine calibration formulas without needing the boat or engine running.
+
+### A. Logging Raw ECU Telemetry to File (`raw_logger.py`)
+
+Run `raw_logger.py` to record real-time raw opcode snapshots from the ECU to a JSON Lines (`.jsonl`) log file:
+
+```bash
+# Record live ECU telemetry at 5 Hz to a timestamped file in logs/
+python3 raw_logger.py --port /dev/ttyUSB0 --rate 5.0
+
+# Record to a specific file for a fixed duration (e.g., 60 seconds)
+python3 raw_logger.py --port /dev/ttyUSB0 --output logs/engine_run_idle.jsonl --duration 60
+```
+
+### B. Offline Replay & Calibration Testing (`replay_raw.py`)
+
+Replay recorded `.jsonl` raw telemetry logs, view real-time decoded output, test modified formulas, or export to CSV:
+
+```bash
+# Replay raw log frame-by-frame in real-time
+python3 replay_raw.py --input logs/engine_run_idle.jsonl
+
+# Replay at 2x speed and export decoded telemetry to CSV
+python3 replay_raw.py --input logs/engine_run_idle.jsonl --speed 2.0 --export-csv calibration_test.csv
+
+# Instant full-file calibration analysis (0x speed)
+python3 replay_raw.py --input logs/engine_run_idle.jsonl --speed 0
+```
+
+### C. Replaying Raw Logs in the Web Dashboard (`server.py`)
+
+Stream recorded raw ECU log files directly to the web dashboard UI:
+
+```bash
+python3 server.py --replay-file logs/engine_run_idle.jsonl --web-port 8000
+```
+

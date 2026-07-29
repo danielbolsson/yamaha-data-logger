@@ -55,6 +55,7 @@ parser.add_argument("--baud", type=int, default=DEFAULT_BAUD_RATE, help="Serial 
 parser.add_argument("--host", default="0.0.0.0", help="Web server host IP (default 0.0.0.0)")
 parser.add_argument("--web-port", type=int, default=DEFAULT_WEB_PORT, help="Web server port (default 8000)")
 parser.add_argument("--mock", action="store_true", default=DEFAULT_MOCK_MODE, help="Force mock simulation mode")
+parser.add_argument("--replay-file", default=None, help="Path to raw telemetry JSONL log file to replay")
 
 # Parse known args so uvicorn / command execution runs cleanly
 cli_args, _ = parser.parse_known_args()
@@ -165,7 +166,8 @@ async def lifespan(app: FastAPI):
     yds_reader_instance = YDSReader(
         port=cli_args.serial_port,
         baudrate=cli_args.baud,
-        mock_mode=cli_args.mock
+        mock_mode=cli_args.mock,
+        replay_file=cli_args.replay_file
     )
 
     # Instantiate GPS Receiver Reader

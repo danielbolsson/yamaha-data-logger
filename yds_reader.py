@@ -16,7 +16,10 @@ YDS Screen Calibrated Opcode Mapping (ECU 63P-8591A-01):
 - Fuel Injection Duration: Opcodes 0x1E & 0x1F (0x01F7 = 503 / 195.0 = 2.58 ms running / 0.00 ms stopped)
 """
 
+import os
+import sys
 import time
+import json
 import math
 import random
 import logging
@@ -43,18 +46,25 @@ class YDSReader:
         baudrate: int = 9600,
         timeout: float = 0.15,
         mock_mode: bool = False,
+        replay_file: Optional[str] = None,
         injector_cc_min: float = 380.0,
         num_cylinders: int = 4
     ):
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
-        self.mock_mode = mock_mode or (serial is None)
+        self.mock_mode = mock_mode or (serial is None and not replay_file)
+        self.replay_file = replay_file
         self.injector_cc_min = injector_cc_min
         self.num_cylinders = num_cylinders
+
+        self._replay_frames = []
+        self._replay_index = 0
+        if self.replay_file:
+            self._load_replay_file()
         
         self.ser: Optional[Any] = None
-        self.is_connected = False
+        self.is_connected = bool(self.replay_file)
         self.last_read_time = 0.0
         self.last_keepalive_time = 0.0
         self.last_connect_attempt = 0.0
@@ -237,6 +247,9 @@ class YDSReader:
         """
         Polls live engine parameters from ECU 63P-8591A-01 calibrated against YDS software screenshots.
         """
+        if self.replay_file:
+            return self._read_replay_telemetry()
+
         if self.mock_mode:
             return self._generate_mock_telemetry()
 
@@ -561,6 +574,135 @@ class YDSReader:
             "has_warnings": False,
             "raw_hex": "",
             "is_mock": self.mock_mode
+        }
+
+    def _load_replay_file(self):
+        """Loads logged raw opcode JSON lines for offline replay."""
+        if not self.replay_file or not os.path.exists(self.replay_file):
+            logger.error(f"Replay file not found: {self.replay_file}")
+            return
+        self._replay_frames = []
+        try:
+            with open(self.replay_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    data = json.loads(line)
+                    if data.get("type") == "frame" or "raw_opcodes" in data:
+                        raw = data.get("raw_opcodes", {})
+                        int_opcodes = {}
+                        for k, v in raw.items():
+                            op_int = int(k, 16) if (isinstance(k, str) and k.startswith("0x")) else int(k)
+                            int_opcodes[op_int] = v
+                        if int_opcodes:
+                            self._replay_frames.append(int_opcodes)
+            logger.info(f"Loaded {len(self._replay_frames)} raw telemetry frames from replay file: {self.replay_file}")
+            self.is_connected = True
+        except Exception as e:
+            logger.error(f"Failed to parse replay log file {self.replay_file}: {e}")
+
+    def _read_replay_telemetry(self) -> Dict[str, Any]:
+        """Serves next raw opcode snapshot from loaded replay log file."""
+        if not self._replay_frames:
+            return self._error_payload("Replay File Empty or Not Found")
+        
+        raw_vals = self._replay_frames[self._replay_index]
+        self._replay_index = (self._replay_index + 1) % len(self._replay_frames)
+        
+        rpm_h = raw_vals.get(0x00, 0)
+        rpm_l = raw_vals.get(0x01, 0)
+        raw_rpm = (rpm_h << 8) | rpm_l
+        rpm = round(float(raw_rpm), 1)
+
+        hrs_h = raw_vals.get(0xE8, 1)
+        hrs_l = raw_vals.get(0xE5, 239)
+        raw_hrs = (hrs_h << 8) | hrs_l
+        engine_hours = round(float(raw_hrs) * 1.00202, 1) if raw_hrs > 0 else 496.0
+
+        raw_tps = raw_vals.get(0x08, 0)
+        tps_volts = round((raw_tps / 1023.0) * 5.0, 3)
+        tps_deg = round((tps_volts - 0.701) * 25.0, 1)
+        tps_percent = round(max(0.0, min(100.0, (tps_volts - 0.669) / (4.5 - 0.669) * 100.0)), 1)
+
+        raw_isc = raw_vals.get(0x41) or raw_vals.get(0x0D, 115)
+        isc_opening_pct = round(raw_isc / 1.7164, 1)
+
+        if rpm > 50.0:
+            raw_map = raw_vals.get(0x0B) or raw_vals.get(0x05, 139)
+            map_kpa = round(raw_map * 0.33108, 2)
+        else:
+            raw_map = raw_vals.get(0x05) or raw_vals.get(0x0B, 233)
+            map_kpa = round(raw_map * 0.42639, 2)
+
+        raw_baro = raw_vals.get(0x51) or raw_vals.get(0x05, 233)
+        baro_hpa = round(raw_baro * 4.2755, 1) if raw_baro <= 255 else round(raw_baro * 3.885, 1)
+
+        oil_h = raw_vals.get(0x0E, 0)
+        oil_l = raw_vals.get(0x0F, 0)
+        raw_oil = (oil_h << 8) | oil_l
+        oil_pressure_kpa = round(raw_oil / 7.16, 1) if (rpm > 50.0 and raw_oil > 0) else 0.0
+        oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
+
+        batt_h = raw_vals.get(0x04) if raw_vals.get(0x04) is not None else raw_vals.get(0x02, 2)
+        batt_l = raw_vals.get(0x40) if raw_vals.get(0x40) is not None else raw_vals.get(0x03, 183)
+        raw_batt = (batt_h << 8) | batt_l
+        battery_voltage = round(raw_batt / 50.216, 2) if raw_batt > 0 else 13.84
+
+        inj_h = raw_vals.get(0x1E, 0)
+        inj_l = raw_vals.get(0x1F, 0)
+        raw_inj = (inj_h << 8) | inj_l
+        injector_ms = round(raw_inj / 195.0, 2) if (rpm > 50.0 and raw_inj > 0) else 0.00
+
+        raw_eng_temp = raw_vals.get(0x91) or raw_vals.get(0xF0, 161)
+        if raw_eng_temp > 100:
+            engine_temp_c = round(float(raw_eng_temp) - 130.0, 1)
+        else:
+            engine_temp_c = round(float(raw_eng_temp) - 5.0, 1)
+        engine_temp_f = round((engine_temp_c * 9.0 / 5.0) + 32.0, 1)
+
+        raw_intake_temp = raw_vals.get(0x1B) or raw_vals.get(0xEF, 125)
+        if raw_intake_temp > 100:
+            intake_temp_c = round(float(raw_intake_temp) - 101.4, 1)
+        else:
+            intake_temp_c = round(float(raw_intake_temp), 1)
+        intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
+
+        fuel_rate_lh = round((injector_ms * rpm * 4 * self.injector_cc_min * 60.0) / (2.0 * 1000.0 * 1000.0 * 0.72), 2) if rpm > 50 else 0.0
+
+        return {
+            "status": "ok",
+            "connected": True,
+            "timestamp": time.time(),
+            "rpm": rpm,
+            "engine_temp_c": engine_temp_c,
+            "engine_temp_f": engine_temp_f,
+            "intake_temp_c": intake_temp_c,
+            "intake_temp_f": intake_temp_f,
+            "tps_percent": tps_percent,
+            "tps_volts": tps_volts,
+            "tps_deg": tps_deg,
+            "isc_opening_pct": isc_opening_pct,
+            "map_kpa": map_kpa,
+            "baro_hpa": baro_hpa,
+            "oil_pressure_kpa": oil_pressure_kpa,
+            "oil_pressure_psi": oil_pressure_psi,
+            "injector_ms": injector_ms,
+            "fuel_rate_lh": fuel_rate_lh,
+            "battery_voltage": battery_voltage,
+            "engine_hours": engine_hours,
+            "shift_neutral": bool(rpm <= 50.0 or raw_vals.get(0x1C, 0) & 0x01),
+            "warnings": {
+                "overheat": bool(engine_temp_c > 95.0),
+                "low_oil_pressure": bool(rpm > 300.0 and oil_pressure_kpa < 100.0),
+                "check_engine": False,
+                "low_voltage": bool(battery_voltage < 11.8),
+                "water_in_fuel": False
+            },
+            "has_warnings": bool(engine_temp_c > 95.0 or (rpm > 300.0 and oil_pressure_kpa < 100.0) or battery_voltage < 11.8),
+            "raw_hex": f"REPLAY_FRAME_{self._replay_index}",
+            "is_mock": False,
+            "is_replay": True
         }
 
 
