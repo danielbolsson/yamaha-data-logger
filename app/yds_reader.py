@@ -474,8 +474,9 @@ class YDSReader:
         }
 
         # 13. Fuel Rate Calculation (L/h)
+        # Formula: (RPM / 2 cycles/min) * (injector_ms / 1000 s) * 4 cyl * (injector_cc_min / 60 s/min) * (60 min/hr / 1000 cc/L)
         if rpm > 50.0 and injector_ms > 0.1:
-            fuel_lh = (rpm / 2.0) * (injector_ms / 1000.0) * num_cylinders * (injector_cc_min / 60.0) * 0.06
+            fuel_lh = (rpm / 2.0) * (injector_ms / 1000.0) * num_cylinders * (injector_cc_min / 1000.0)
             fuel_rate_lh = round(fuel_lh, 2)
         else:
             fuel_rate_lh = 0.0
@@ -508,7 +509,7 @@ class YDSReader:
         if rpm <= 50.0 or injector_ms <= 0.1:
             return 0.0
 
-        fuel_lh = (rpm / 2.0) * (injector_ms / 1000.0) * self.num_cylinders * (self.injector_cc_min / 60.0) * 0.06
+        fuel_lh = (rpm / 2.0) * (injector_ms / 1000.0) * self.num_cylinders * (self.injector_cc_min / 1000.0)
         return round(fuel_lh, 2)
 
     def _generate_mock_telemetry(self) -> Dict[str, Any]:

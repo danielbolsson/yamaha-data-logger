@@ -92,11 +92,11 @@ async def telemetry_background_loop():
 
             # Read GPS snapshot
             gps_data = gps_reader_instance.read_gps(engine_rpm=data.get("rpm", 0.0)) if gps_reader_instance else {}
-            speed_kts = gps_data.get("speed_knots", 0.0)
+            speed_kts = gps_data.get("speed_knots", 0.0) or data.get("gps_speed_kts", 0.0) or data.get("gps", {}).get("speed_knots", 0.0)
             fuel_lh = data.get("fuel_rate_lh", 0.0)
 
-            # Calculate Fuel Economy in Liters per Nautical Mile (L/NM)
-            fuel_economy_l_nm = round(fuel_lh / speed_kts, 2) if speed_kts > 0.5 and fuel_lh > 0 else 0.0
+            # Calculate Fuel Economy in Liters per Nautical Mile (L/NM) = Fuel Flow Rate (L/h) / Speed (KTS)
+            fuel_economy_l_nm = round(fuel_lh / speed_kts, 2) if speed_kts > 0.3 and fuel_lh > 0 else 0.0
 
             # Calculate real-time fuel consumption if running (live hardware mode only)
             if data and data.get("status") == "ok" and not is_mock:
