@@ -294,27 +294,28 @@ This hardware baud-rate transition triggers the K-Line level shifter and wakes u
 ### B. Sequential YDS Telemetry Frame Protocol
 Once unlocked, the ECU requires every polling cycle to execute a structured frame sequence:
 
-$$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \mathtt{0xE5} \rightarrow \mathtt{0xFE} \rightarrow \mathtt{0xFF} \rightarrow \mathtt{0xDE} \rightarrow \mathtt{0xD0} \rightarrow \mathtt{0xF0} \rightarrow \mathtt{0xEF} \rightarrow \mathtt{0x00} \rightarrow \mathtt{0x01} \rightarrow \mathtt{0x08} \rightarrow \mathtt{0x09} \rightarrow \mathtt{0x0A} \rightarrow \mathtt{0x0B} \rightarrow \mathtt{0x0E} \rightarrow \mathtt{0x0F} \rightarrow \mathtt{0x02} \rightarrow \mathtt{0x03} \rightarrow \mathtt{0xF1}$$
+$$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \mathtt{0xE5} \rightarrow \mathtt{0xE8} \rightarrow \mathtt{0xFE} \rightarrow \mathtt{0xFF} \rightarrow \mathtt{0xDE} \rightarrow \mathtt{0xD0} \rightarrow \mathtt{0xF0} \rightarrow \mathtt{0xEF} \rightarrow \mathtt{0x00} \rightarrow \mathtt{0x01} \rightarrow \mathtt{0x04} \rightarrow \mathtt{0x05} \rightarrow \mathtt{0x08} \rightarrow \mathtt{0x09} \rightarrow \mathtt{0x0B} \rightarrow \mathtt{0x0E} \rightarrow \mathtt{0x0F} \rightarrow \mathtt{0x1B} \rightarrow \mathtt{0x1D} \rightarrow \mathtt{0x40} \rightarrow \mathtt{0x41} \rightarrow \mathtt{0x51} \rightarrow \mathtt{0x91} \rightarrow \mathtt{0xE9} \rightarrow \mathtt{0x02} \rightarrow \mathtt{0x03} \rightarrow \mathtt{0xF1}$$
 
 ### C. Opcode Mapping & Data Conversion Table
 
-| Opcode | Parameter | Type | Conversion / Formula | Example Raw $\rightarrow$ Decoded Value |
+| Opcode(s) | Parameter | Type | Conversion / Formula | Example Raw $\rightarrow$ Decoded Value |
 | :---: | :--- | :---: | :--- | :--- |
 | `0x1C` | Diagnostic Sync / Heartbeat | 8-bit | Handshake & Watchdog Reset | Payload `0x03` |
 | `0xFD` | Diagnostic Session Unlock | 8-bit | Diagnostic Mode Unlock | Payload `0x00` |
-| `0xE5` | Engine Operating Hours | 8-bit | $\text{Hours} = \text{Raw} \times 2.071$ | `0xEF` (239) $\rightarrow$ **495.0 Hours** |
+| `0xE8` / `0xE5` | Total Engine Hours | 16-bit | $\text{Hours} = ((\text{High} \ll 8) \mid \text{Low}) \times 1.00202$ | `0x01EF` (495) $\rightarrow$ **496.0 Hours** |
 | `0xFE` | ECU Status | 8-bit | Status Flags | Payload `0x00` |
 | `0xFF` | ECU Model Sub-ID | 8-bit | Hardware Identification | `0x06` $\rightarrow$ **Yamaha 63P-01** |
-| `0xDE` | Subsystem Unlock | 8-bit | Mode Flag | Payload `0x00` |
-| `0xD0` | Subsystem Unlock | 8-bit | Mode Flag | Payload `0x00` |
-| `0x91` | Engine Coolant Temp | 8-bit | $\text{°C} = \text{Raw} + 4.5$ ($\text{°F} = \text{°C} \times 1.8 + 32$) | `0x1D` (29) $\rightarrow$ **33.5 °C / 92.0 °F** |
-| `0x1B` | Intake Air Temp | 8-bit | $\text{°C} = \text{Raw} - 101.4$ | `0x80` (128) $\rightarrow$ **26.6 °C / 79.7 °F** |
-| `0x00` / `0x01` | Engine Speed RPM | 16-bit | $\text{RPM} = (\text{High} \ll 8) \mid \text{Low}$ | `0x0315` (789) $\rightarrow$ **787.0 r/min** |
-| `0x08` / `0x09` | Throttle Position (TPS) | 16-bit | $\text{V} = \text{Raw} \times 0.0009784$, $\text{deg} = (\text{Raw} - 700) \times 0.0833$ | `0x02B6` (694) $\rightarrow$ **0.679 V / -0.5 deg (0.0%)** |
-| `0x05` / `0x0B` | Manifold Absolute Pressure (MAP) | 8-bit | Stopped: $\text{Raw}_{05} \times 0.4253$, Running: $\text{Raw}_{0B} \times 0.3311$ | `0xE9` (233) $\rightarrow$ **99.09 kPa**, `0x8B` (139) $\rightarrow$ **46.02 kPa** |
-| `0x41` | ISC Valve Opening | 8-bit | $\text{\%} = \text{Raw} / 1.7164$ | `0x73` (115) $\rightarrow$ **67 %** |
-| `0x0E` / `0x0F` | Oil Pressure | 16-bit | $\text{kPa} = \text{Raw} / 7.16$ | `0x0A19` (2585) $\rightarrow$ **361.0 kPa / 52.3 PSI** |
-| `0x1D` | Battery Voltage | 8-bit | $\text{Volts} = \text{Raw} / 17.222$ | `0xDE` (222) $\rightarrow$ **12.89 V**, `0xED` (237) $\rightarrow$ **13.79 V** |
+| `0xDE` / `0xD0` | Subsystem Unlock | 8-bit | Diagnostic Mode Flags | Payload `0x00` |
+| `0x91` / `0xF0` | Engine Temperature | 8-bit | $\text{Raw} > 100 \Rightarrow \text{°C} = \text{Raw} - 130.0$ else $\text{Raw} - 5.0$ | `0xA1` (161) $\rightarrow$ **31.0 °C / 87.8 °F** |
+| `0x1B` / `0xEF` | Intake Air Temperature | 8-bit | $\text{Raw} > 100 \Rightarrow \text{°C} = \text{Raw} - 101.4$ else $\text{Raw}$ | `0x7D` (125) $\rightarrow$ **23.6 °C / 74.5 °F** |
+| `0x00` / `0x01` | Engine Speed (RPM) | 16-bit | $\text{RPM} = (\text{High} \ll 8) \mid \text{Low}$ | `0x02B0` (688) $\rightarrow$ **688.0 r/min** |
+| `0x08` / `0x09` | Throttle Position (TPS) | 16-bit | $\text{V} = \text{Raw} \times 0.00097838$, $\text{deg} = (\text{Raw} - 700) \times 0.08333$ | `0x02B6` (694) $\rightarrow$ **0.679 V / -0.5 deg (0.0%)** |
+| `0x05` / `0x0B` | Manifold Pressure (MAP) | 8-bit | Stopped: $\text{Raw}_{05} \times 0.42639$, Running: $\text{Raw}_{0B} \times 0.33108$ | `0xE9` (233) $\rightarrow$ **99.35 kPa**, `0x8B` (139) $\rightarrow$ **46.02 kPa** |
+| `0x51` | Barometric Pressure | 8-bit | $\text{hPa} = \text{Raw} \times 4.2755$ | `0xE9` (233) $\rightarrow$ **996.2 hPa** |
+| `0x41` / `0x0D` | ISC Valve Opening | 8-bit | $\text{\%} = \text{Raw} / 1.7164$ | `0x73` (115) $\rightarrow$ **67.0 %** |
+| `0x0E` / `0x0F` | Oil Pressure | 16-bit | $\text{kPa} = ((\text{High} \ll 8) \mid \text{Low}) / 7.16$ | `0x0A43` (2627) $\rightarrow$ **366.8 kPa / 53.2 PSI** |
+| `0x04` / `0x40` | Battery Voltage | 16-bit | $\text{Volts} = ((\text{High} \ll 8) \mid \text{Low}) / 50.216$ | `0x027B` (635) $\rightarrow$ **12.64 V**, `0x02B7` (695) $\rightarrow$ **13.84 V** |
+| `0x1E` / `0x1F` | Fuel Injector Duration | 16-bit | $\text{ms} = ((\text{High} \ll 8) \mid \text{Low}) / 195.0$ | `0x01F7` (503) $\rightarrow$ **2.58 ms** |
 | `0xF1` | Streaming Enable | 8-bit | Streaming Session Keep-Alive | Refresh every $\le 8$ seconds |
 
 ### D. Session Watchdog & Auto-Recovery

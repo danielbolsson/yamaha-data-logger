@@ -4,16 +4,16 @@ Yamaha Diagnostic System (YDS) Telemetry Decoder for Yamaha F150 (ECU 63P-8591A-
 Calibrated directly against official Yamaha YDS Diagnostic Software screen readouts.
 
 YDS Screen Calibrated Opcode Mapping (ECU 63P-8591A-01):
-- Engine Speed (RPM): Opcodes 0x00 (High) & 0x01 (Low) (0x02E7 = 743 r/min exact match!)
-- Total Engine Hours: Opcodes 0x94 (High) & 0x95 (Low) (0x01EF = 495 Hours exact match!)
-- Throttle Position (TPS): Opcode 0x08 (0x02 = 0.0% idle / 0.679V, increases with throttle)
-- Intake MAP Pressure: Opcode 0x05 (0x7B = 123 -> 47.75 kPa running / 98.82 kPa stopped)
-- Atmospheric Baro Pressure: Opcode 0x51 (0xFE -> 986.9 hPa / 98.69 kPa)
-- Oil Pressure: Opcodes 0x0E (High) & 0x0F (Low) / 7.16 (357.0 kPa / 50.9 psi running, 0.0 kPa stopped)
-- Battery Voltage: Opcodes 0x04 (High) & 0x40 (Low) / 50.0 (13.77 Volts DC)
-- Engine Temperature: Opcode 0x91 (0x13 -> 19.5 °C / 39.0 °C running)
-- Intake Temperature: Opcode 0x1B (0xC0 -> 17.2 °C / 21.6 °C running)
-- Fuel Injection Duration: Opcodes 0x1E & 0x1F (0x01F7 = 503 / 195.0 = 2.58 ms running / 0.00 ms stopped)
+- Engine Speed (RPM): Opcodes 0x00 (High) & 0x01 (Low) -> (High << 8) | Low (688 r/min exact match!)
+- Total Engine Hours: Opcodes 0xE8 (High) & 0xE5 (Low) -> ((High << 8) | Low) * 1.00202 (496.0 Hours exact match!)
+- Throttle Position (TPS): Opcodes 0x08 & 0x09 -> (Raw * 0.00097838) -> 0.679V / -0.5 deg (0.0% idle)
+- Intake MAP Pressure: Opcode 0x0B running (Raw * 0.33108 = 46.02 kPa) / Opcode 0x05 stopped (Raw * 0.42639 = 99.35 kPa)
+- Atmospheric Baro Pressure: Opcode 0x51 -> Raw * 4.2755 (996.2 hPa exact match!)
+- Oil Pressure: Opcodes 0x0E (High) & 0x0F (Low) / 7.16 -> 366.8 kPa / 53.2 psi (0.0 kPa stopped)
+- Battery Voltage: Opcodes 0x04 (High) & 0x40 (Low) / 50.216 -> 12.64V stopped / 13.84V running exact match!
+- Engine Temperature: Opcode 0x91 / 0xF0 -> Raw > 100 ? Raw - 130.0 : Raw - 5.0 (31.0 °C / 87.8 °F exact match!)
+- Intake Temperature: Opcode 0x1B / 0xEF -> Raw > 100 ? Raw - 101.4 : Raw (23.6 °C / 74.5 °F exact match!)
+- Fuel Injection Duration: Opcodes 0x1E & 0x1F -> Raw / 195.0 = 2.58 ms running (0.00 ms stopped)
 """
 
 import os
