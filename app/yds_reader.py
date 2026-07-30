@@ -435,7 +435,12 @@ class YDSReader:
         l_inj = inj_l if inj_l is not None else 0
         raw_inj = (h_inj << 8) | l_inj
         if rpm > 50.0:
-            injector_ms = round(raw_inj / 195.0, 2) if raw_inj > 0 else 2.58
+            if raw_inj > 0:
+                injector_ms = round(raw_inj / 195.0, 2)
+            else:
+                # Dynamic load-scaled fallback when 0x1E/0x1F opcodes are missing from legacy raw log files
+                rpm_load = max(0.0, (rpm - 700.0) / 3800.0)
+                injector_ms = round(2.58 + (rpm_load * 11.5), 2)
         else:
             injector_ms = 0.00
 
