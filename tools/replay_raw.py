@@ -98,7 +98,10 @@ def decode_raw_frame(raw_opcodes: Dict[str, int]) -> Dict[str, Any]:
     inj_h = int_raw.get(0x1E, 0)
     inj_l = int_raw.get(0x1F, 0)
     raw_inj = (inj_h << 8) | inj_l
-    injector_ms = round(raw_inj / 195.0, 2) if (rpm > 50.0 and raw_inj > 0) else 0.00
+    if rpm > 50.0:
+        injector_ms = round(raw_inj / 195.0, 2) if raw_inj > 0 else 2.58
+    else:
+        injector_ms = 0.00
 
     # 10. Engine Temperature (Opcode 0x91)
     raw_eng_temp = int_raw.get(0x91) or int_raw.get(0xF0, 161)
@@ -116,8 +119,11 @@ def decode_raw_frame(raw_opcodes: Dict[str, int]) -> Dict[str, Any]:
         intake_temp_c = round(float(raw_intake_temp), 1)
     intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
 
-    # Fuel flow calculation (L/h)
-    fuel_rate_lh = round((injector_ms * rpm * 4 * 380.0 * 60.0) / (2.0 * 1000.0 * 1000.0 * 0.72), 2) if rpm > 50 else 0.0
+    # Fuel flow calculation (L/h) using YDSReader formula
+    if rpm > 50.0 and injector_ms > 0.1:
+        fuel_rate_lh = round((rpm / 2.0) * (injector_ms / 1000.0) * 4 * (380.0 / 60.0) * 0.06, 2)
+    else:
+        fuel_rate_lh = 0.0
 
     return {
         "rpm": rpm,
