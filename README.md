@@ -126,7 +126,7 @@ python3 server.py --serial-port /dev/ttyUSB0 --baud 9600 --web-port 8000
 ### Direct File Transfer (SCP Deployment)
 If copying repository files directly to a remote Raspberry Pi via `scp` (without `git clone`), ensure all core Python modules and static assets are included:
 ```bash
-scp -r server.py database.py yds_reader.py requirements.txt static/ admin@<PI-IP>:/path/to/yamaha-data-logger/
+scp -r server.py yds_reader.py gps_reader.py db/ tools/ requirements.txt static/ admin@<PI-IP>:/path/to/yamaha-data-logger/
 ```
 
 ---
@@ -323,31 +323,31 @@ $$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \m
 
 You can record raw Yamaha ECU opcode responses to a file on your boat or laptop and replay them offline to test and refine calibration formulas without needing the boat or engine running.
 
-### A. Logging Raw ECU Telemetry to File (`raw_logger.py`)
+### A. Logging Raw ECU Telemetry to File (`tools/raw_logger.py`)
 
-Run `raw_logger.py` to record real-time raw opcode snapshots from the ECU to a JSON Lines (`.jsonl`) log file:
+Run `tools/raw_logger.py` to record real-time raw opcode snapshots from the ECU to a JSON Lines (`.jsonl`) log file:
 
 ```bash
 # Record live ECU telemetry at 5 Hz to a timestamped file in logs/
-python3 raw_logger.py --port /dev/ttyUSB0 --rate 5.0
+python3 tools/raw_logger.py --port /dev/ttyUSB0 --rate 5.0
 
 # Record to a specific file for a fixed duration (e.g., 60 seconds)
-python3 raw_logger.py --port /dev/ttyUSB0 --output logs/engine_run_idle.jsonl --duration 60
+python3 tools/raw_logger.py --port /dev/ttyUSB0 --output logs/engine_run_idle.jsonl --duration 60
 ```
 
-### B. Offline Replay & Calibration Testing (`replay_raw.py`)
+### B. Offline Replay & Calibration Testing (`tools/replay_raw.py`)
 
 Replay recorded `.jsonl` raw telemetry logs, view real-time decoded output, test modified formulas, or export to CSV:
 
 ```bash
 # Replay raw log frame-by-frame in real-time
-python3 replay_raw.py --input logs/engine_run_idle.jsonl
+python3 tools/replay_raw.py --input logs/engine_run_idle.jsonl
 
 # Replay at 2x speed and export decoded telemetry to CSV
-python3 replay_raw.py --input logs/engine_run_idle.jsonl --speed 2.0 --export-csv calibration_test.csv
+python3 tools/replay_raw.py --input logs/engine_run_idle.jsonl --speed 2.0 --export-csv calibration_test.csv
 
 # Instant full-file calibration analysis (0x speed)
-python3 replay_raw.py --input logs/engine_run_idle.jsonl --speed 0
+python3 tools/replay_raw.py --input logs/engine_run_idle.jsonl --speed 0
 ```
 
 ### C. Replaying Raw Logs in the Web Dashboard (`server.py`)

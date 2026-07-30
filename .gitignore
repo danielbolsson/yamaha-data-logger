@@ -14,5 +14,9 @@ ENV/
 *.swp
 *.swo
 
-# Log files
+# Log & Database files
 *.log
+*.db
+db/*.db
+db/*.db-wal
+db/*.db-shm

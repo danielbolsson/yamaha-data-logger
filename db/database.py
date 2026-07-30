@@ -13,7 +13,9 @@ import logging
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("yds_database")
-DB_PATH = os.getenv("YDS_DB_PATH", "yamaha_telemetry.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DB_PATH = os.path.join(BASE_DIR, "yamaha_telemetry.db")
+DB_PATH = os.getenv("YDS_DB_PATH", DEFAULT_DB_PATH)
 
 
 def get_db_connection():
