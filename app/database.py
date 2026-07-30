@@ -67,9 +67,37 @@ def init_db():
                 battery_voltage REAL,
                 fuel_rate_lh REAL,
                 injector_ms REAL,
-                warnings_json TEXT
+                warnings_json TEXT,
+                gps_speed_kts REAL,
+                gps_heading_deg REAL,
+                gps_cardinal TEXT,
+                gps_satellites INTEGER,
+                gps_has_fix INTEGER,
+                gps_latitude REAL,
+                gps_longitude REAL,
+                fuel_economy_l_nm REAL
             );
         """)
+
+        # Migration check: Add GPS columns to telemetry_history if missing in existing DB
+        cursor.execute("PRAGMA table_info(telemetry_history);")
+        existing_cols = {col["name"] for col in cursor.fetchall()}
+
+        gps_columns = [
+            ("gps_speed_kts", "REAL"),
+            ("gps_heading_deg", "REAL"),
+            ("gps_cardinal", "TEXT"),
+            ("gps_satellites", "INTEGER"),
+            ("gps_has_fix", "INTEGER"),
+            ("gps_latitude", "REAL"),
+            ("gps_longitude", "REAL"),
+            ("fuel_economy_l_nm", "REAL")
+        ]
+
+        for col_name, col_type in gps_columns:
+            if col_name not in existing_cols:
+                logger.info(f"Migrating SQLite schema: Adding column {col_name} ({col_type}) to telemetry_history...")
+                cursor.execute(f"ALTER TABLE telemetry_history ADD COLUMN {col_name} {col_type};")
 
         # Seed initial fuel row if empty
         cursor.execute("SELECT COUNT(*) FROM fuel_state WHERE id = 1;")
@@ -114,40 +142,46 @@ def get_fuel_state() -> Dict[str, Any]:
     }
 
 
-def update_fuel_state(current_fuel: float, trip_consumed: Optional[float] = None, capacity: float = 170.0) -> Dict[str, Any]:
-    """Updates current fuel level and trip consumption in SQLite."""
-    clamped_fuel = max(0.0, min(capacity, current_fuel))
+def update_fuel_state(current_liters: float, trip_consumed: Optional[float] = None, capacity: Optional[float] = None) -> Dict[str, Any]:
+    """Updates fuel level and trip consumption in SQLite."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            if trip_consumed is not None:
-                cursor.execute("""
-                    UPDATE fuel_state
-                    SET current_fuel_liters = ?, trip_consumed_liters = ?, updated_at = ?
-                    WHERE id = 1;
-                """, (clamped_fuel, max(0.0, trip_consumed), time.time()))
-            else:
-                cursor.execute("""
-                    UPDATE fuel_state
-                    SET current_fuel_liters = ?, updated_at = ?
-                    WHERE id = 1;
-                """, (clamped_fuel, time.time()))
+            cur_state = get_fuel_state()
+            new_rem = round(max(0.0, min(capacity or cur_state["tank_capacity_liters"], current_liters)), 2)
+            new_cap = round(capacity or cur_state["tank_capacity_liters"], 1)
+            new_trip = round(trip_consumed if trip_consumed is not None else cur_state["trip_consumed_liters"], 2)
+            now = time.time()
+
+            cursor.execute("""
+                UPDATE fuel_state
+                SET current_fuel_liters = ?, tank_capacity_liters = ?, trip_consumed_liters = ?, updated_at = ?
+                WHERE id = 1;
+            """, (new_rem, new_cap, new_trip, now))
             conn.commit()
+
+            pct = round(max(0.0, min(100.0, (new_rem / new_cap) * 100.0)), 1) if new_cap > 0 else 0.0
+            return {
+                "current_fuel_liters": new_rem,
+                "tank_capacity_liters": new_cap,
+                "trip_consumed_liters": new_trip,
+                "fuel_percent": pct,
+                "updated_at": now
+            }
     except Exception as e:
         logger.error(f"Error updating fuel state in SQLite: {e}")
-
-    return get_fuel_state()
+        return get_fuel_state()
 
 
 def adjust_fuel_level(delta_liters: float) -> Dict[str, Any]:
-    """Adjusts current fuel level by delta liters (+1, -1, +20, -20) in SQLite."""
+    """Adjusts current fuel level by delta (+/- liters) in SQLite."""
     current_state = get_fuel_state()
     new_level = current_state["current_fuel_liters"] + delta_liters
-    return update_fuel_state(new_level, capacity=current_state["tank_capacity_liters"])
+    return update_fuel_state(new_level)
 
 
 def fill_tank_full(capacity: float = 170.0) -> Dict[str, Any]:
-    """Resets fuel tank level to 170L full capacity in SQLite."""
+    """Fills fuel tank to full capacity in SQLite."""
     return update_fuel_state(capacity, capacity=capacity)
 
 
@@ -158,7 +192,7 @@ def reset_trip_consumed() -> Dict[str, Any]:
 
 
 def log_telemetry_frame(data: Dict[str, Any]):
-    """Logs a single telemetry snapshot frame to SQLite history table."""
+    """Logs a single telemetry snapshot frame (ECU + GPS metrics) to SQLite history table."""
     if not data or data.get("status") != "ok":
         return
 
@@ -169,8 +203,10 @@ def log_telemetry_frame(data: Dict[str, Any]):
                 INSERT INTO telemetry_history (
                     timestamp, rpm, engine_hours, tps_percent, map_kpa, baro_hpa,
                     engine_temp_c, intake_temp_c, oil_pressure_kpa, battery_voltage,
-                    fuel_rate_lh, injector_ms, warnings_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    fuel_rate_lh, injector_ms, warnings_json,
+                    gps_speed_kts, gps_heading_deg, gps_cardinal, gps_satellites,
+                    gps_has_fix, gps_latitude, gps_longitude, fuel_economy_l_nm
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, (
                 data.get("timestamp", time.time()),
                 data.get("rpm", 0.0),
@@ -184,7 +220,15 @@ def log_telemetry_frame(data: Dict[str, Any]):
                 data.get("battery_voltage", 0.0),
                 data.get("fuel_rate_lh", 0.0),
                 data.get("injector_ms", 0.0),
-                json.dumps(data.get("warnings", {}))
+                json.dumps(data.get("warnings", {})),
+                data.get("gps_speed_kts", 0.0),
+                data.get("gps_heading_deg", 0.0),
+                data.get("gps_cardinal", "N"),
+                data.get("gps_satellites", 0),
+                1 if data.get("gps_has_fix") else 0,
+                data.get("gps_latitude", 0.0),
+                data.get("gps_longitude", 0.0),
+                data.get("fuel_economy_l_nm", 0.0)
             ))
             conn.commit()
     except Exception as e:
@@ -200,7 +244,9 @@ def get_history(limit: int = 100) -> List[Dict[str, Any]]:
             cursor.execute("""
                 SELECT timestamp, rpm, engine_hours, tps_percent, map_kpa, baro_hpa,
                        engine_temp_c, intake_temp_c, oil_pressure_kpa, battery_voltage,
-                       fuel_rate_lh, injector_ms, warnings_json
+                       fuel_rate_lh, injector_ms, warnings_json,
+                       gps_speed_kts, gps_heading_deg, gps_cardinal, gps_satellites,
+                       gps_has_fix, gps_latitude, gps_longitude, fuel_economy_l_nm
                 FROM telemetry_history
                 ORDER BY id DESC LIMIT ?;
             """, (limit,))
@@ -212,6 +258,7 @@ def get_history(limit: int = 100) -> List[Dict[str, Any]]:
                         rec["warnings"] = json.loads(rec["warnings_json"])
                     except Exception:
                         rec["warnings"] = {}
+                rec["gps_has_fix"] = bool(rec.get("gps_has_fix", 0))
                 records.append(rec)
     except Exception as e:
         logger.error(f"Error reading telemetry history from SQLite: {e}")

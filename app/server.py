@@ -119,6 +119,8 @@ async def telemetry_background_loop():
                 "gps_cardinal": gps_data.get("cardinal_heading", "N"),
                 "gps_satellites": gps_data.get("satellites", 0),
                 "gps_has_fix": gps_data.get("has_fix", False),
+                "gps_latitude": gps_data.get("latitude", 0.0),
+                "gps_longitude": gps_data.get("longitude", 0.0),
                 "fuel_economy_l_nm": fuel_economy_l_nm
             })
 
