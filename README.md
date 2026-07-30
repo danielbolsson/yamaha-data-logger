@@ -20,7 +20,7 @@ A real-time telemetry decoding engine and marine helm web dashboard for **Yamaha
 
 - **Yamaha Outboard Engine:** F150 / F115 / F200 / F225 (ECU `63P-8591A-01` / `63P-01`).
 - **USB K-Line Adapter:** 12V ISO 9141-2 K-Line diagnostic cable (`/dev/ttyUSB0`).
-- **USB GPS / GNSS Receiver:** u-blox 7 USB GNSS Receiver (Vendor ID `1546`, Product ID `01a7`, device `/dev/ttyACM0`).
+- **USB GPS / GNSS Receiver:** u-blox 7 USB GNSS Receiver (Vendor ID `1546`, Product ID `01a7`, `cdc_acm` driver, device `/dev/ttyACM0`). Parses NMEA `$GPRMC` and `$GPGGA` sentences to provide real-time Vessel Speed (KTS), Heading/Course (°N), Satellite Fix State, Satellite Count, and calculates Live Fuel Economy (**`L/NM`** = Fuel Rate L/h / Speed KTS).
 
 > [!IMPORTANT]
 > **Ignition Key Requirement:** The boat ignition key switch **MUST BE ON** for the ECU to power up and respond to K-Line requests.
@@ -75,9 +75,13 @@ To assign a fixed device symlink (e.g. `/dev/ttyUSB-yds`) regardless of USB port
    sudo nano /etc/udev/rules.d/99-yamaha-yds.rules
    ```
 
-3. Add the rule line (adjust `idVendor`/`idProduct` if necessary):
+3. Add the rule lines (adjust `idVendor`/`idProduct` if necessary):
    ```udev
+   # Yamaha YDS K-Line Cable (/dev/ttyUSB0 -> /dev/ttyUSB-yds)
    SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", SYMLINK+="ttyUSB-yds", GROUP="dialout", MODE="0666"
+
+   # u-blox 7 GPS Receiver (/dev/ttyACM0 -> /dev/ttyACM-gps)
+   SUBSYSTEM=="tty", ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a7", SYMLINK+="ttyACM-gps", GROUP="dialout", MODE="0666"
    ```
 
 4. Reload `udev` rules:
@@ -118,7 +122,7 @@ python3 app/yds_reader.py --port /dev/ttyUSB0 --baud 9600
 Launch the FastAPI WebSocket server and dashboard interface:
 
 ```bash
-python3 app/server.py --serial-port /dev/ttyUSB0 --baud 9600 --web-port 8000
+python3 app/server.py --serial-port /dev/ttyUSB0 --gps-port /dev/ttyACM0 --baud 9600 --web-port 8000
 ```
 - Open a web browser to **`http://localhost:8000`** or **`http://<RPI-IP>:8000`**.
 - Verify REST status API: `http://localhost:8000/api/status`
@@ -165,7 +169,7 @@ To run the telemetry server automatically when the system boots:
    Type=simple
    User=pi
    WorkingDirectory=/home/pi/yamaha-data-logger
-   ExecStart=/home/pi/yamaha-data-logger/venv/bin/python3 /home/pi/yamaha-data-logger/app/server.py --serial-port /dev/ttyUSB0 --web-port 8000
+   ExecStart=/home/pi/yamaha-data-logger/venv/bin/python3 /home/pi/yamaha-data-logger/app/server.py --serial-port /dev/ttyUSB0 --gps-port /dev/ttyACM0 --web-port 8000
    Restart=always
    RestartSec=5
 
@@ -355,6 +359,6 @@ python3 tools/replay_raw.py --input logs/engine_run_idle.jsonl --speed 0
 Stream recorded raw ECU log files directly to the web dashboard UI:
 
 ```bash
-python3 app/server.py --replay-file logs/engine_run_idle.jsonl --web-port 8000
+python3 app/server.py --replay-file logs/engine_run_idle.jsonl --gps-port /dev/ttyACM0 --web-port 8000
 ```
 
