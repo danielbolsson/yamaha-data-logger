@@ -299,175 +299,209 @@ class YDSReader:
                 logger.warning("ECU did not respond to queries (0 payload bytes received, TX echo only). Check ignition key switch & wiring.")
                 return self._error_payload("ECU Not Responding (TX Echo Only - Check Key Switch & Wiring)")
 
-            # 1. Total Engine Operating Hours (Opcodes 0xE8 High & 0xE5 Low -> 496.0 HRS exact match with YDS!)
-            l_hrs = hrs_l if hrs_l is not None else 239
-            h_hrs = hrs_h if hrs_h is not None else 1
-            raw_hrs = (h_hrs << 8) | l_hrs
-            engine_hours = round(float(raw_hrs) * 1.00202, 1) if raw_hrs > 0 else 496.0
-
-            # 2. Direct 1:1 Engine Speed (16-bit: Opcodes 0x00 & 0x01)
-            rpm_h = raw_vals.get(0x00)
-            rpm_l = raw_vals.get(0x01)
-            
-            h_val = rpm_h if rpm_h is not None else 0
-            l_val = rpm_l if rpm_l is not None else 0
-            raw_rpm = (h_val << 8) | l_val
-            
-            if 50 < raw_rpm <= 7000:
-                rpm = round(float(raw_rpm), 1)
-            elif l_val > 50:
-                rpm = round(float(l_val), 1)
-            else:
-                rpm = 0.0
-
-            # 3. Throttle Position TPS % & Voltage (16-bit Hardware ADC Opcodes 0x08 & 0x09 -> 0.679V / -0.5 deg / 0.0% exact match!)
-            tps_h = raw_vals.get(0x08)
-            tps_l = raw_vals.get(0x09)
-            raw_tps_v = raw_vals.get(0xE9) or raw_vals.get(0x0A)
-            
-            if tps_h is not None and tps_l is not None:
-                raw_tps = (tps_h << 8) | tps_l
-                if raw_tps >= 600:
-                    tps_volts = round(raw_tps * 0.00097838, 3)
-                    tps_deg = round((raw_tps - 700) * 0.08333, 1)
-                    tps_pct = round(max(0.0, min(100.0, (tps_deg + 0.5) / 90.5 * 100.0)), 1)
-                else:
-                    tps_volts = 0.679
-                    tps_deg = -0.5
-                    tps_pct = 0.0
-            elif raw_tps_v is not None and raw_tps_v > 0:
-                tps_volts = round((raw_tps_v / 255.0) * 5.0, 3)
-                tps_deg = round((tps_volts - 0.70) * 25.0, 1)
-                tps_pct = round(max(0.0, min(100.0, (tps_deg + 0.5) / 90.5 * 100.0)), 1)
-            else:
-                tps_volts = 0.679
-                tps_deg = -0.5
-                tps_pct = 0.0
-
-            # 4. ISC Valve Opening (Opcode 0x41 -> 115 / 1.7164 = 67 % exact match!)
-            raw_isc = raw_vals.get(0x41) or raw_vals.get(0x0D)
-            isc_opening_pct = round(raw_isc / 1.7164, 1) if (raw_isc is not None and raw_isc > 0) else 67.0
-
-            # 5. Intake MAP Pressure (Opcode 0x0B running -> 139 * 0.33108 = 46.02 kPa / Opcode 0x05 stopped -> 233 * 0.42639 = 99.35 kPa exact match!)
-            if rpm > 50.0:
-                raw_map = raw_vals.get(0x0B) or raw_vals.get(0x05)
-                map_kpa = round(raw_map * 0.33108, 2) if (raw_map is not None and raw_map > 0) else 46.02
-            else:
-                raw_map = raw_vals.get(0x05) or raw_vals.get(0x0B)
-                map_kpa = round(raw_map * 0.42639, 2) if (raw_map is not None and raw_map > 0) else 99.35
-
-            # 6. Atmospheric / Baro Pressure (Opcode 0x05 -> 233 * 4.2755 = 996.2 hPa exact match!)
-            raw_baro = raw_vals.get(0x51) or raw_vals.get(0x05)
-            if raw_baro is not None and raw_baro > 0:
-                baro_hpa = round(raw_baro * 4.2755, 1) if raw_baro <= 255 else round(raw_baro * 3.885, 1)
-            else:
-                baro_hpa = 996.2
-
-            # 7. Oil Pressure (16-bit: Opcodes 0x0E & 0x0F -> 0.0 kPa engine off)
-            oil_h = raw_vals.get(0x0E)
-            oil_l = raw_vals.get(0x0F)
-            h_oil = oil_h if oil_h is not None else 0
-            l_oil = oil_l if oil_l is not None else 0
-            raw_oil = (h_oil << 8) | l_oil
-            if rpm > 50.0:
-                oil_pressure_kpa = round(raw_oil / 7.16, 1) if raw_oil > 0 else 357.0
-            else:
-                oil_pressure_kpa = 0.0
-            oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
-
-            # 8. Battery Voltage (16-bit ADC: Opcodes 0x04 & 0x40 -> 635 / 50.216 = 12.64V stopped / 695 / 50.216 = 13.84V running EXACT MATCH with YDS!)
-            batt_h = raw_vals.get(0x04) if raw_vals.get(0x04) is not None else raw_vals.get(0x02)
-            batt_l = raw_vals.get(0x40) if raw_vals.get(0x40) is not None else raw_vals.get(0x03)
-            h_batt = batt_h if batt_h is not None else 0
-            l_batt = batt_l if batt_l is not None else 0
-            raw_batt = (h_batt << 8) | l_batt
-
-            if raw_batt > 0:
-                battery_voltage = round(raw_batt / 50.216, 2)
-            else:
-                battery_voltage = 13.84
-
-            # 9. Injector Pulse Width (Opcodes 0x1E & 0x1F -> 0.00 ms engine off)
-            inj_h = raw_vals.get(0x1E)
-            inj_l = raw_vals.get(0x1F)
-            h_inj = inj_h if inj_h is not None else 0
-            l_inj = inj_l if inj_l is not None else 0
-            raw_inj = (h_inj << 8) | l_inj
-            if rpm > 50.0:
-                injector_ms = round(raw_inj / 195.0, 2) if raw_inj > 0 else 2.58
-            else:
-                injector_ms = 0.00
-
-            # 10. Engine Temperature (Opcode 0x91 -> 161 - 130.0 = 31.0 °C / 88.0 °F exact match with YDS screenshot!)
-            raw_eng_temp = raw_vals.get(0x91) or raw_vals.get(0xF0)
-            if raw_eng_temp is not None and raw_eng_temp > 0:
-                if raw_eng_temp > 100:
-                    engine_temp_c = round(float(raw_eng_temp) - 130.0, 1)
-                else:
-                    engine_temp_c = round(float(raw_eng_temp) - 5.0, 1)
-            else:
-                engine_temp_c = 31.0
-            engine_temp_f = round((engine_temp_c * 9.0 / 5.0) + 32.0, 1)
-
-            # 11. Intake Air Temperature (Opcode 0x1B -> 125 - 101.4 = 23.6 °C / 74.3 °F exact match with YDS screenshot!)
-            raw_intake_temp = raw_vals.get(0x1B) or raw_vals.get(0xEF)
-            if raw_intake_temp is not None and raw_intake_temp > 0:
-                if raw_intake_temp > 100:
-                    intake_temp_c = round(float(raw_intake_temp) - 101.4, 1)
-                else:
-                    intake_temp_c = round(float(raw_intake_temp), 1)
-            else:
-                intake_temp_c = 23.6
-            intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
-
-            # 11. Warnings & Switch Status
-            low_oil_alarm = bool(rpm > 300.0 and oil_pressure_kpa < 100.0)
-            overheat_alarm = bool(engine_temp_c > 95.0)
-            low_volt_alarm = bool(battery_voltage < 11.8)
-
-            warnings = {
-                "overheat": overheat_alarm,
-                "low_oil_pressure": low_oil_alarm,
-                "check_engine": False,
-                "low_voltage": low_volt_alarm,
-                "water_in_fuel": False
-            }
-
-            fuel_rate_lh = self.calculate_fuel_flow(rpm, injector_ms)
+            decoded = self.decode_raw_frame(raw_vals, self.num_cylinders, self.injector_cc_min)
             self.last_read_time = time.time()
-
-            return {
+            decoded.update({
                 "status": "ok",
                 "connected": True,
                 "timestamp": time.time(),
-                "rpm": rpm,
-                "engine_temp_c": engine_temp_c,
-                "engine_temp_f": engine_temp_f,
-                "intake_temp_c": intake_temp_c,
-                "intake_temp_f": intake_temp_f,
-                "tps_percent": tps_pct,
-                "tps_volts": tps_volts,
-                "tps_deg": tps_deg,
-                "isc_opening_pct": isc_opening_pct,
-                "map_kpa": map_kpa,
-                "baro_hpa": baro_hpa,
-                "oil_pressure_kpa": oil_pressure_kpa,
-                "oil_pressure_psi": oil_pressure_psi,
-                "injector_ms": injector_ms,
-                "fuel_rate_lh": fuel_rate_lh,
-                "battery_voltage": battery_voltage,
-                "engine_hours": engine_hours,
-                "shift_neutral": True,
-                "warnings": warnings,
-                "has_warnings": any(warnings.values()),
-                "raw_hex": f"RPM:{rpm}_HOURS:{engine_hours}_TPS:{tps_pct}%({tps_deg}deg)_MAP:{map_kpa}kPa_OIL:{oil_pressure_kpa}kPa",
+                "raw_hex": f"RPM:{decoded['rpm']}_HOURS:{decoded['engine_hours']}_TPS:{decoded['tps_percent']}%_MAP:{decoded['map_kpa']}kPa_OIL:{decoded['oil_pressure_kpa']}kPa",
                 "is_mock": False
-            }
+            })
+            return decoded
 
         except Exception as e:
             logger.error(f"Error reading 63P telemetry: {e}")
             self.is_connected = False
             return self._error_payload(f"Read Error: {str(e)}")
+
+    @staticmethod
+    def decode_raw_frame(
+        raw_vals: Dict[Any, Any],
+        num_cylinders: int = 4,
+        injector_cc_min: float = 380.0
+    ) -> Dict[str, Any]:
+        """
+        Decodes a dictionary of raw integer opcode values (keyed by int opcode or hex string like "0x00")
+        into a dictionary of calibrated telemetry parameters.
+        Single source of truth used by live telemetry, mock simulation, and offline log replay.
+        """
+        int_raw = {}
+        if isinstance(raw_vals, dict):
+            for k, v in raw_vals.items():
+                if v is None:
+                    continue
+                if isinstance(k, str) and k.startswith("0x"):
+                    try:
+                        int_raw[int(k, 16)] = int(v)
+                    except (ValueError, TypeError):
+                        pass
+                elif isinstance(k, (int, str)):
+                    try:
+                        int_raw[int(k)] = int(v)
+                    except (ValueError, TypeError):
+                        pass
+
+        # 1. Total Engine Operating Hours (Opcodes 0xE8 High & 0xE5 Low)
+        hrs_h = int_raw.get(0xE8)
+        hrs_l = int_raw.get(0xE5)
+        l_hrs = hrs_l if hrs_l is not None else 239
+        h_hrs = hrs_h if hrs_h is not None else 1
+        raw_hrs = (h_hrs << 8) | l_hrs
+        engine_hours = round(float(raw_hrs) * 1.00202, 1) if raw_hrs > 0 else 496.0
+
+        # 2. Engine Speed RPM (16-bit: Opcodes 0x00 & 0x01)
+        rpm_h = int_raw.get(0x00)
+        rpm_l = int_raw.get(0x01)
+        h_val = rpm_h if rpm_h is not None else 0
+        l_val = rpm_l if rpm_l is not None else 0
+        raw_rpm = (h_val << 8) | l_val
+        if 50 < raw_rpm <= 7000:
+            rpm = round(float(raw_rpm), 1)
+        elif l_val > 50:
+            rpm = round(float(l_val), 1)
+        else:
+            rpm = 0.0
+
+        # 3. Throttle Position TPS % & Voltage (16-bit Opcodes 0x08 & 0x09 / 0x0A / 0xE9)
+        tps_h = int_raw.get(0x08)
+        tps_l = int_raw.get(0x09)
+        raw_tps_v = int_raw.get(0xE9) or int_raw.get(0x0A)
+        if tps_h is not None and tps_l is not None:
+            raw_tps = (tps_h << 8) | tps_l
+            if raw_tps >= 600:
+                tps_volts = round(raw_tps * 0.00097838, 3)
+                tps_deg = round((raw_tps - 700) * 0.08333, 1)
+                tps_pct = round(max(0.0, min(100.0, (tps_deg + 0.5) / 90.5 * 100.0)), 1)
+            else:
+                tps_volts = 0.679
+                tps_deg = -0.5
+                tps_pct = 0.0
+        elif raw_tps_v is not None and raw_tps_v > 0:
+            tps_volts = round((raw_tps_v / 255.0) * 5.0, 3)
+            tps_deg = round((tps_volts - 0.70) * 25.0, 1)
+            tps_pct = round(max(0.0, min(100.0, (tps_deg + 0.5) / 90.5 * 100.0)), 1)
+        else:
+            tps_volts = 0.679
+            tps_deg = -0.5
+            tps_pct = 0.0
+
+        # 4. ISC Valve Opening (Opcode 0x41 / 0x0D)
+        raw_isc = int_raw.get(0x41) or int_raw.get(0x0D)
+        isc_opening_pct = round(raw_isc / 1.7164, 1) if (raw_isc is not None and raw_isc > 0) else 67.0
+
+        # 5. Intake MAP Pressure (Opcode 0x0B running / 0x05 stopped)
+        if rpm > 50.0:
+            raw_map = int_raw.get(0x0B) or int_raw.get(0x05)
+            map_kpa = round(raw_map * 0.33108, 2) if (raw_map is not None and raw_map > 0) else 46.02
+        else:
+            raw_map = int_raw.get(0x05) or int_raw.get(0x0B)
+            map_kpa = round(raw_map * 0.42639, 2) if (raw_map is not None and raw_map > 0) else 99.35
+
+        # 6. Atmospheric / Baro Pressure (Opcode 0x51 / 0x05)
+        raw_baro = int_raw.get(0x51) or int_raw.get(0x05)
+        if raw_baro is not None and raw_baro > 0:
+            baro_hpa = round(raw_baro * 4.2755, 1) if raw_baro <= 255 else round(raw_baro * 3.885, 1)
+        else:
+            baro_hpa = 996.2
+
+        # 7. Oil Pressure (16-bit: Opcodes 0x0E & 0x0F)
+        oil_h = int_raw.get(0x0E)
+        oil_l = int_raw.get(0x0F)
+        h_oil = oil_h if oil_h is not None else 0
+        l_oil = oil_l if oil_l is not None else 0
+        raw_oil = (h_oil << 8) | l_oil
+        if rpm > 50.0:
+            oil_pressure_kpa = round(raw_oil / 7.16, 1) if raw_oil > 0 else 357.0
+        else:
+            oil_pressure_kpa = 0.0
+        oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
+
+        # 8. Battery Voltage (16-bit: Opcodes 0x04 & 0x40 / 0x02 & 0x03)
+        batt_h = int_raw.get(0x04) if int_raw.get(0x04) is not None else int_raw.get(0x02)
+        batt_l = int_raw.get(0x40) if int_raw.get(0x40) is not None else int_raw.get(0x03)
+        h_batt = batt_h if batt_h is not None else 0
+        l_batt = batt_l if batt_l is not None else 0
+        raw_batt = (h_batt << 8) | l_batt
+        if raw_batt > 0:
+            battery_voltage = round(raw_batt / 50.216, 2)
+        else:
+            battery_voltage = 13.84
+
+        # 9. Injector Pulse Width (Opcodes 0x1E & 0x1F)
+        inj_h = int_raw.get(0x1E)
+        inj_l = int_raw.get(0x1F)
+        h_inj = inj_h if inj_h is not None else 0
+        l_inj = inj_l if inj_l is not None else 0
+        raw_inj = (h_inj << 8) | l_inj
+        if rpm > 50.0:
+            injector_ms = round(raw_inj / 195.0, 2) if raw_inj > 0 else 2.58
+        else:
+            injector_ms = 0.00
+
+        # 10. Engine Temperature (Opcode 0x91 / 0xF0)
+        raw_eng_temp = int_raw.get(0x91) or int_raw.get(0xF0)
+        if raw_eng_temp is not None and raw_eng_temp > 0:
+            if raw_eng_temp > 100:
+                engine_temp_c = round(float(raw_eng_temp) - 130.0, 1)
+            else:
+                engine_temp_c = round(float(raw_eng_temp) - 5.0, 1)
+        else:
+            engine_temp_c = 31.0
+        engine_temp_f = round((engine_temp_c * 9.0 / 5.0) + 32.0, 1)
+
+        # 11. Intake Air Temperature (Opcode 0x1B / 0xEF)
+        raw_intake_temp = int_raw.get(0x1B) or int_raw.get(0xEF)
+        if raw_intake_temp is not None and raw_intake_temp > 0:
+            if raw_intake_temp > 100:
+                intake_temp_c = round(float(raw_intake_temp) - 101.4, 1)
+            else:
+                intake_temp_c = round(float(raw_intake_temp), 1)
+        else:
+            intake_temp_c = 23.6
+        intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
+
+        # 12. Warnings & Switch Status
+        low_oil_alarm = bool(rpm > 300.0 and oil_pressure_kpa < 100.0)
+        overheat_alarm = bool(engine_temp_c > 95.0)
+        low_volt_alarm = bool(battery_voltage < 11.8)
+        warnings = {
+            "overheat": overheat_alarm,
+            "low_oil_pressure": low_oil_alarm,
+            "check_engine": False,
+            "low_voltage": low_volt_alarm,
+            "water_in_fuel": False
+        }
+
+        # 13. Fuel Rate Calculation (L/h)
+        if rpm > 50.0 and injector_ms > 0.1:
+            fuel_lh = (rpm / 2.0) * (injector_ms / 1000.0) * num_cylinders * (injector_cc_min / 60.0) * 0.06
+            fuel_rate_lh = round(fuel_lh, 2)
+        else:
+            fuel_rate_lh = 0.0
+
+        return {
+            "rpm": rpm,
+            "engine_hours": engine_hours,
+            "engine_temp_c": engine_temp_c,
+            "engine_temp_f": engine_temp_f,
+            "intake_temp_c": intake_temp_c,
+            "intake_temp_f": intake_temp_f,
+            "tps_percent": tps_pct,
+            "tps_volts": tps_volts,
+            "tps_deg": tps_deg,
+            "isc_opening_pct": isc_opening_pct,
+            "map_kpa": map_kpa,
+            "baro_hpa": baro_hpa,
+            "oil_pressure_kpa": oil_pressure_kpa,
+            "oil_pressure_psi": oil_pressure_psi,
+            "injector_ms": injector_ms,
+            "fuel_rate_lh": fuel_rate_lh,
+            "battery_voltage": battery_voltage,
+            "shift_neutral": True,
+            "warnings": warnings,
+            "has_warnings": any(warnings.values())
+        }
 
     def calculate_fuel_flow(self, rpm: float, injector_ms: float) -> float:
         """Calculates real-time engine fuel consumption rate in Liters/Hour (L/h)."""
