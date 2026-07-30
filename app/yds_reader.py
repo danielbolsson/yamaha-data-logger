@@ -108,7 +108,7 @@ class YDSReader:
 
     def connect(self, force_rehandshake: bool = False) -> bool:
         """Establishes serial connection to physical serial port."""
-        if self.mock_mode:
+        if self.mock_mode or self.replay_file:
             self.is_connected = True
             return True
 
@@ -426,7 +426,7 @@ class YDSReader:
         if raw_batt > 0:
             battery_voltage = round(raw_batt / 50.216, 2)
         else:
-            battery_voltage = 13.84
+            battery_voltage = 12.34
 
         # 9. Injector Pulse Width (Opcodes 0x1E & 0x1F)
         inj_h = int_raw.get(0x1E)
@@ -644,101 +644,17 @@ class YDSReader:
         
         raw_vals = self._replay_frames[self._replay_index]
         self._replay_index = (self._replay_index + 1) % len(self._replay_frames)
-        
-        rpm_h = raw_vals.get(0x00, 0)
-        rpm_l = raw_vals.get(0x01, 0)
-        raw_rpm = (rpm_h << 8) | rpm_l
-        rpm = round(float(raw_rpm), 1)
 
-        hrs_h = raw_vals.get(0xE8, 1)
-        hrs_l = raw_vals.get(0xE5, 239)
-        raw_hrs = (hrs_h << 8) | hrs_l
-        engine_hours = round(float(raw_hrs) * 1.00202, 1) if raw_hrs > 0 else 496.0
-
-        raw_tps = raw_vals.get(0x08, 0)
-        tps_volts = round((raw_tps / 1023.0) * 5.0, 3)
-        tps_deg = round((tps_volts - 0.701) * 25.0, 1)
-        tps_percent = round(max(0.0, min(100.0, (tps_volts - 0.669) / (4.5 - 0.669) * 100.0)), 1)
-
-        raw_isc = raw_vals.get(0x41) or raw_vals.get(0x0D, 115)
-        isc_opening_pct = round(raw_isc / 1.7164, 1)
-
-        if rpm > 50.0:
-            raw_map = raw_vals.get(0x0B) or raw_vals.get(0x05, 139)
-            map_kpa = round(raw_map * 0.33108, 2)
-        else:
-            raw_map = raw_vals.get(0x05) or raw_vals.get(0x0B, 233)
-            map_kpa = round(raw_map * 0.42639, 2)
-
-        raw_baro = raw_vals.get(0x51) or raw_vals.get(0x05, 233)
-        baro_hpa = round(raw_baro * 4.2755, 1) if raw_baro <= 255 else round(raw_baro * 3.885, 1)
-
-        oil_h = raw_vals.get(0x0E, 0)
-        oil_l = raw_vals.get(0x0F, 0)
-        raw_oil = (oil_h << 8) | oil_l
-        oil_pressure_kpa = round(raw_oil / 7.16, 1) if (rpm > 50.0 and raw_oil > 0) else 0.0
-        oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
-
-        batt_h = raw_vals.get(0x04) if raw_vals.get(0x04) is not None else raw_vals.get(0x02, 2)
-        batt_l = raw_vals.get(0x40) if raw_vals.get(0x40) is not None else raw_vals.get(0x03, 183)
-        raw_batt = (batt_h << 8) | batt_l
-        battery_voltage = round(raw_batt / 50.216, 2) if raw_batt > 0 else 13.84
-
-        inj_h = raw_vals.get(0x1E, 0)
-        inj_l = raw_vals.get(0x1F, 0)
-        raw_inj = (inj_h << 8) | inj_l
-        injector_ms = round(raw_inj / 195.0, 2) if (rpm > 50.0 and raw_inj > 0) else 0.00
-
-        raw_eng_temp = raw_vals.get(0x91) or raw_vals.get(0xF0, 161)
-        if raw_eng_temp > 100:
-            engine_temp_c = round(float(raw_eng_temp) - 130.0, 1)
-        else:
-            engine_temp_c = round(float(raw_eng_temp) - 5.0, 1)
-        engine_temp_f = round((engine_temp_c * 9.0 / 5.0) + 32.0, 1)
-
-        raw_intake_temp = raw_vals.get(0x1B) or raw_vals.get(0xEF, 125)
-        if raw_intake_temp > 100:
-            intake_temp_c = round(float(raw_intake_temp) - 101.4, 1)
-        else:
-            intake_temp_c = round(float(raw_intake_temp), 1)
-        intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
-
-        fuel_rate_lh = round((injector_ms * rpm * 4 * self.injector_cc_min * 60.0) / (2.0 * 1000.0 * 1000.0 * 0.72), 2) if rpm > 50 else 0.0
-
-        return {
+        decoded = self.decode_raw_frame(raw_vals, self.num_cylinders, self.injector_cc_min)
+        decoded.update({
             "status": "ok",
             "connected": True,
             "timestamp": time.time(),
-            "rpm": rpm,
-            "engine_temp_c": engine_temp_c,
-            "engine_temp_f": engine_temp_f,
-            "intake_temp_c": intake_temp_c,
-            "intake_temp_f": intake_temp_f,
-            "tps_percent": tps_percent,
-            "tps_volts": tps_volts,
-            "tps_deg": tps_deg,
-            "isc_opening_pct": isc_opening_pct,
-            "map_kpa": map_kpa,
-            "baro_hpa": baro_hpa,
-            "oil_pressure_kpa": oil_pressure_kpa,
-            "oil_pressure_psi": oil_pressure_psi,
-            "injector_ms": injector_ms,
-            "fuel_rate_lh": fuel_rate_lh,
-            "battery_voltage": battery_voltage,
-            "engine_hours": engine_hours,
-            "shift_neutral": bool(rpm <= 50.0 or raw_vals.get(0x1C, 0) & 0x01),
-            "warnings": {
-                "overheat": bool(engine_temp_c > 95.0),
-                "low_oil_pressure": bool(rpm > 300.0 and oil_pressure_kpa < 100.0),
-                "check_engine": False,
-                "low_voltage": bool(battery_voltage < 11.8),
-                "water_in_fuel": False
-            },
-            "has_warnings": bool(engine_temp_c > 95.0 or (rpm > 300.0 and oil_pressure_kpa < 100.0) or battery_voltage < 11.8),
             "raw_hex": f"REPLAY_FRAME_{self._replay_index}",
             "is_mock": False,
             "is_replay": True
-        }
+        })
+        return decoded
 
 
 if __name__ == "__main__":
