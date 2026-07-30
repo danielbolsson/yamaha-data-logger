@@ -13,13 +13,21 @@ import logging
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger("yds_database")
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DB_PATH = os.path.join(BASE_DIR, "yamaha_telemetry.db")
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DEFAULT_DB_PATH = os.path.join(PROJECT_ROOT, "db", "yamaha_telemetry.db")
 DB_PATH = os.getenv("YDS_DB_PATH", DEFAULT_DB_PATH)
+
+
+def ensure_db_dir():
+    """Ensures the database directory exists before accessing SQLite database."""
+    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
 
 
 def get_db_connection():
     """Establishes connection to SQLite database with WAL mode for fast concurrent access."""
+    ensure_db_dir()
     conn = sqlite3.connect(DB_PATH, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")

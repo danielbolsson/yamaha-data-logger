@@ -20,9 +20,12 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 
+# Ensure app directory is in sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from yds_reader import YDSReader
 from gps_reader import GPSReader
-from db import database
+import database
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")

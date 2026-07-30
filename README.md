@@ -110,7 +110,7 @@ python3 tests/scan_yamaha_yds.py --port /dev/ttyUSB0
 Test the calibrated telemetry decoder directly in the terminal to verify live parameter reading:
 
 ```bash
-python3 yds_reader.py --port /dev/ttyUSB0 --baud 9600
+python3 app/yds_reader.py --port /dev/ttyUSB0 --baud 9600
 ```
 - **Expected Outcome:** Displays real-time RPM, Engine Operating Hours, TPS %, MAP Pressure, Oil Pressure, and Temperatures directly in the console output.
 
@@ -118,7 +118,7 @@ python3 yds_reader.py --port /dev/ttyUSB0 --baud 9600
 Launch the FastAPI WebSocket server and dashboard interface:
 
 ```bash
-python3 server.py --serial-port /dev/ttyUSB0 --baud 9600 --web-port 8000
+python3 app/server.py --serial-port /dev/ttyUSB0 --baud 9600 --web-port 8000
 ```
 - Open a web browser to **`http://localhost:8000`** or **`http://<RPI-IP>:8000`**.
 - Verify REST status API: `http://localhost:8000/api/status`
@@ -126,7 +126,7 @@ python3 server.py --serial-port /dev/ttyUSB0 --baud 9600 --web-port 8000
 ### Direct File Transfer (SCP Deployment)
 If copying repository files directly to a remote Raspberry Pi via `scp` (without `git clone`), ensure all core Python modules and static assets are included:
 ```bash
-scp -r server.py yds_reader.py gps_reader.py db/ tools/ requirements.txt static/ admin@<PI-IP>:/path/to/yamaha-data-logger/
+scp -r app/ tools/ requirements.txt admin@<PI-IP>:/path/to/yamaha-data-logger/
 ```
 
 ---
@@ -137,11 +137,11 @@ You can run both the reader CLI and the web server in mock mode to test the UI o
 
 - **CLI Reader Mock:**
   ```bash
-  python3 yds_reader.py --mock
+  python3 app/yds_reader.py --mock
   ```
 - **Web Server Mock:**
   ```bash
-  python3 server.py --mock --web-port 8000
+  python3 app/server.py --mock --web-port 8000
   ```
 
 ---
@@ -165,7 +165,7 @@ To run the telemetry server automatically when the system boots:
    Type=simple
    User=pi
    WorkingDirectory=/home/pi/yamaha-data-logger
-   ExecStart=/home/pi/yamaha-data-logger/venv/bin/python3 /home/pi/yamaha-data-logger/server.py --serial-port /dev/ttyUSB0 --web-port 8000
+   ExecStart=/home/pi/yamaha-data-logger/venv/bin/python3 /home/pi/yamaha-data-logger/app/server.py --serial-port /dev/ttyUSB0 --web-port 8000
    Restart=always
    RestartSec=5
 
@@ -350,11 +350,11 @@ python3 tools/replay_raw.py --input logs/engine_run_idle.jsonl --speed 2.0 --exp
 python3 tools/replay_raw.py --input logs/engine_run_idle.jsonl --speed 0
 ```
 
-### C. Replaying Raw Logs in the Web Dashboard (`server.py`)
+### C. Replaying Raw Logs in the Web Dashboard (`app/server.py`)
 
 Stream recorded raw ECU log files directly to the web dashboard UI:
 
 ```bash
-python3 server.py --replay-file logs/engine_run_idle.jsonl --web-port 8000
+python3 app/server.py --replay-file logs/engine_run_idle.jsonl --web-port 8000
 ```
 

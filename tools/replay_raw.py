@@ -20,13 +20,14 @@ import argparse
 import logging
 from typing import Dict, Any, List
 
-# Ensure parent directory is in sys.path for yds_reader import
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Ensure app directory is in sys.path for yds_reader import
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "app"))
 
 try:
     from yds_reader import YDSReader
 except ImportError:
-    print("Error: yds_reader module not found.")
+    print("Error: yds_reader module not found in app directory.")
     sys.exit(1)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
