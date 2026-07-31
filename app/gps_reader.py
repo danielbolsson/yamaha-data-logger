@@ -11,6 +11,8 @@ import math
 import random
 import logging
 import threading
+import datetime
+import subprocess
 from typing import Dict, Any, Optional
 
 try:
@@ -55,6 +57,12 @@ class GPSReader:
         self.latitude = 0.0
         self.longitude = 0.0
         self.last_fix_time = 0.0
+
+        # GPS Time & System Clock Synchronization State
+        self.last_gps_utc_timestamp: Optional[float] = None
+        self.last_clock_sync_check: float = 0.0
+        self.last_clock_sync_time: float = 0.0
+        self.clock_drift_seconds: float = 0.0
 
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -188,6 +196,25 @@ class GPSReader:
                 self.has_fix = True
                 self.last_fix_time = time.time()
 
+                # Parse GPS UTC Timestamp & Date, Sync System Clock if off > 5.0 seconds
+                if len(tokens) >= 10 and tokens[1] and tokens[9]:
+                    time_str = tokens[1]
+                    date_str = tokens[9]
+                    if len(time_str) >= 6 and len(date_str) == 6:
+                        try:
+                            hh = int(time_str[0:2])
+                            mm = int(time_str[2:4])
+                            ss = int(time_str[4:6])
+                            day = int(date_str[0:2])
+                            month = int(date_str[2:4])
+                            year = 2000 + int(date_str[4:6])
+                            dt_gps = datetime.datetime(year, month, day, hh, mm, ss, tzinfo=datetime.timezone.utc)
+                            gps_ts = dt_gps.timestamp()
+                            self.last_gps_utc_timestamp = gps_ts
+                            self.sync_system_clock_if_needed(gps_ts, dt_gps)
+                        except Exception as e:
+                            logger.debug(f"Error parsing GPS timestamp from RMC ({date_str} {time_str}): {e}")
+
                 # Speed in Knots
                 if tokens[7]:
                     try:
@@ -267,6 +294,61 @@ class GPSReader:
         except Exception:
             return 0.0
 
+    def sync_system_clock_if_needed(self, gps_timestamp: float, gps_dt: datetime.datetime):
+        """
+        Compares host system time against GPS UTC time.
+        If system time drift exceeds 5.0 seconds, synchronizes the system clock.
+        Rate-limited to once every 10 seconds to prevent excessive calls.
+        """
+        now = time.time()
+        if (now - self.last_clock_sync_check) < 10.0:
+            return
+
+        self.last_clock_sync_check = now
+        drift = abs(gps_timestamp - now)
+        self.clock_drift_seconds = round(drift, 1)
+
+        if drift > 5.0:
+            sys_utc = datetime.datetime.fromtimestamp(now, tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            gps_utc = gps_dt.strftime("%Y-%m-%d %H:%M:%S")
+            logger.warning(
+                f"⏰ System clock drift detected! System time ({sys_utc} UTC) "
+                f"differs by {drift:.1f}s from GPS UTC ({gps_utc}). Synchronizing system clock..."
+            )
+            success = self._set_system_clock(gps_timestamp, gps_dt)
+            if success:
+                self.last_clock_sync_time = time.time()
+                self.clock_drift_seconds = 0.0
+
+    def _set_system_clock(self, gps_timestamp: float, gps_dt: datetime.datetime) -> bool:
+        """Sets host Linux system clock to GPS UTC time."""
+        utc_str = gps_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Method 1: standard Linux 'date -u -s "YYYY-MM-DD HH:MM:SS"'
+        try:
+            subprocess.run(["date", "-u", "-s", utc_str], capture_output=True, text=True, check=True)
+            logger.info(f"✅ System clock successfully set via date command: {utc_str} UTC")
+            return True
+        except (subprocess.CalledProcessError, PermissionError, OSError):
+            pass
+
+        # Method 2: 'sudo -n date -u -s "YYYY-MM-DD HH:MM:SS"' (passwordless sudo if available)
+        try:
+            subprocess.run(["sudo", "-n", "date", "-u", "-s", utc_str], capture_output=True, text=True, check=True)
+            logger.info(f"✅ System clock successfully set via sudo date: {utc_str} UTC")
+            return True
+        except (subprocess.CalledProcessError, PermissionError, OSError):
+            pass
+
+        # Method 3: 'date -s "@<timestamp>"'
+        try:
+            subprocess.run(["date", "-s", f"@{int(gps_timestamp)}"], capture_output=True, text=True, check=True)
+            logger.info(f"✅ System clock successfully set via timestamp: {gps_timestamp}")
+            return True
+        except (subprocess.CalledProcessError, PermissionError, OSError) as e:
+            logger.error(f"❌ Failed to set system clock from GPS time ({utc_str}): Permission denied or missing date utility.")
+            return False
+
     @staticmethod
     def deg_to_cardinal(deg: float) -> str:
         """Converts compass heading degrees (0 - 360) to cardinal direction (N, NE, E, SE, S, SW, W, NW)."""
@@ -296,6 +378,8 @@ class GPSReader:
                 "fix_quality": 1,
                 "latitude": 57.70887,
                 "longitude": 11.97456,
+                "gps_utc_timestamp": time.time(),
+                "clock_drift_seconds": 0.0,
                 "is_mock": True
             }
 
@@ -317,6 +401,8 @@ class GPSReader:
                 "fix_quality": self.fix_quality,
                 "latitude": 0.0,
                 "longitude": 0.0,
+                "gps_utc_timestamp": self.last_gps_utc_timestamp,
+                "clock_drift_seconds": self.clock_drift_seconds,
                 "is_mock": False
             }
 
@@ -333,6 +419,8 @@ class GPSReader:
             "fix_quality": self.fix_quality,
             "latitude": self.latitude,
             "longitude": self.longitude,
+            "gps_utc_timestamp": self.last_gps_utc_timestamp,
+            "clock_drift_seconds": self.clock_drift_seconds,
             "is_mock": False
         }
 

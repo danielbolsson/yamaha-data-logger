@@ -20,7 +20,7 @@ A real-time telemetry decoding engine and marine helm web dashboard for **Yamaha
 
 - **Yamaha Outboard Engine:** F150 / F115 / F200 / F225 (ECU `63P-8591A-01` / `63P-01`).
 - **USB K-Line Adapter:** 12V ISO 9141-2 K-Line diagnostic cable (`/dev/ttyUSB0`).
-- **USB GPS / GNSS Receiver:** u-blox 7 USB GNSS Receiver (Vendor ID `1546`, Product ID `01a7`, `cdc_acm` driver, device `/dev/ttyACM0`). Parses NMEA `$GPRMC` and `$GPGGA` sentences to provide real-time Vessel Speed (KTS), Heading/Course (°N), Satellite Fix State, Satellite Count, and calculates Live Fuel Economy (**`L/NM`** = Fuel Rate L/h / Speed KTS).
+- **USB GPS / GNSS Receiver:** u-blox 7 USB GNSS Receiver (Vendor ID `1546`, Product ID `01a7`, `cdc_acm` driver, device `/dev/ttyACM0`). Parses NMEA `$GPRMC` and `$GPGGA` sentences to provide real-time Vessel Speed (KTS), Heading/Course (°N), Satellite Fix State, Satellite Count, calculates Live Fuel Economy (**`L/NM`** = Fuel Rate L/h / Speed KTS), and **automatically synchronizes host system clock** if local time drifts by more than 5.0 seconds from satellite GPS UTC.
 
 > [!IMPORTANT]
 > **Ignition Key Requirement:** The boat ignition key switch **MUST BE ON** for the ECU to power up and respond to K-Line requests.
