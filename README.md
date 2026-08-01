@@ -330,11 +330,14 @@ You can record raw Yamaha ECU opcode responses to a file on your boat or laptop 
 
 ### A. Logging Raw ECU Telemetry to File (`tools/raw_logger.py`)
 
-Run `tools/raw_logger.py` to record real-time raw opcode snapshots from the ECU to a JSON Lines (`.jsonl`) log file:
+Run `tools/raw_logger.py` to record real-time raw opcode snapshots from the ECU to a JSON Lines (`.jsonl`) log file. By default, it sweeps **all 256 ECU opcodes (`0x00` through `0xFF`)** to capture complete raw diagnostic data:
 
 ```bash
-# Record live ECU telemetry at 5 Hz to a timestamped file in logs/
-python3 tools/raw_logger.py --port /dev/ttyUSB0 --rate 5.0
+# Record full 256-opcode ECU sweep (0x00 - 0xFF) at 1 Hz
+python3 tools/raw_logger.py --port /dev/ttyUSB0
+
+# Record high-rate 5 Hz stream of primary 31 telemetry opcodes
+python3 tools/raw_logger.py --port /dev/ttyUSB0 --primary-only --rate 5.0
 
 # Record to a specific file for a fixed duration (e.g., 60 seconds)
 python3 tools/raw_logger.py --port /dev/ttyUSB0 --output logs/engine_run_idle.jsonl --duration 60
