@@ -32,23 +32,23 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("raw_logger")
 
-PRIMARY_OPCODES = [
+SAFE_TELEMETRY_OPCODES = [
     0x1C, 0xFD, 0xE5, 0xE8, 0xFE, 0xFF, 0xDE, 0xD0, 0xF0, 0xEF,
     0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0B, 0x0E, 0x0F,
     0x1B, 0x1D, 0x1E, 0x1F, 0x40, 0x41, 0x51, 0x91, 0xE9, 0x02, 0x03, 0xF1
 ]
 
-ALL_256_OPCODES = list(range(256))  # Complete 0x00 through 0xFF address sweep
+ALL_256_OPCODES = list(range(256))  # Complete 0x00 through 0xFF address sweep (BENCH ONLY)
 
 
 def create_raw_logger():
     parser = argparse.ArgumentParser(description="Log raw Yamaha YDS ECU opcode telemetry to file.")
     parser.add_argument("--port", default="/dev/ttyUSB0", help="Serial port (default: /dev/ttyUSB0)")
     parser.add_argument("--baud", type=int, default=9600, help="Baud rate (default: 9600)")
-    parser.add_argument("--rate", type=float, default=None, help="Polling rate in Hz (default: 1.0 Hz for all 256 opcodes, 5.0 Hz for primary opcodes)")
+    parser.add_argument("--rate", type=float, default=5.0, help="Polling rate in Hz (default: 5.0 Hz)")
     parser.add_argument("--output", default=None, help="Output file path (default: logs/raw_ecu_<timestamp>.jsonl)")
     parser.add_argument("--duration", type=float, default=0, help="Logging duration limit in seconds (0 = unlimited)")
-    parser.add_argument("--primary-only", action="store_true", help="Poll only primary 31 telemetry opcodes at high rate (5 Hz)")
+    parser.add_argument("--full-sweep-bench-only", action="store_true", help="Sweep all 256 opcodes 0x00-0xFF (BENCH ONLY! May trigger active diagnostic tests / engine misfires)")
     parser.add_argument("--mock", action="store_true", help="Run in mock mode generating simulated raw frames")
     return parser
 
@@ -58,16 +58,15 @@ def log_raw_telemetry():
     args = parser.parse_args()
 
     # Determine opcodes list & default polling rate
-    if args.primary_only:
-        target_opcodes = PRIMARY_OPCODES
-        default_rate = 5.0
-        mode_label = "Primary 31 Telemetry Opcodes"
-    else:
+    if args.full_sweep_bench_only:
         target_opcodes = ALL_256_OPCODES
-        default_rate = 1.0
-        mode_label = "Full 256 Opcode Sweep (0x00 - 0xFF)"
-
-    polling_rate = args.rate if args.rate is not None else default_rate
+        polling_rate = args.rate if args.rate != 5.0 else 1.0
+        mode_label = "Full 256 Opcode Sweep (0x00 - 0xFF) [BENCH MODE]"
+        logger.warning("⚠️  WARNING: Full 256 opcode sweep enabled! Sweeping active diagnostic opcodes can trigger cylinder cut-off & ignition tests, causing engine misfires! Only use on bench or key-on engine-off.")
+    else:
+        target_opcodes = SAFE_TELEMETRY_OPCODES
+        polling_rate = args.rate
+        mode_label = "Safe Telemetry Opcodes (31 Read-Only Opcodes)"
 
     # Determine output filepath
     if not args.output:
@@ -81,7 +80,7 @@ def log_raw_telemetry():
 
     reader = YDSReader(port=args.port, baudrate=args.baud, mock_mode=args.mock)
     # Set per-opcode timeout lower for full 256-opcode sweeps to maximize throughput
-    if not args.primary_only:
+    if args.full_sweep_bench_only:
         reader.timeout = 0.03
 
     logger.info(f"Initializing YDS Raw Telemetry Logger -> Saving to: {args.output}")
@@ -113,7 +112,7 @@ def log_raw_telemetry():
                 "engine": "Yamaha F150",
                 "timestamp_start": start_time,
                 "iso_start": datetime.datetime.utcnow().isoformat() + "Z",
-                "polling_mode": "primary_only" if args.primary_only else "full_256_opcodes",
+                "polling_mode": "full_256_opcodes" if args.full_sweep_bench_only else "safe_telemetry_opcodes",
                 "polling_rate_hz": polling_rate,
                 "opcodes_polled": [f"0x{op:02X}" for op in target_opcodes]
             }

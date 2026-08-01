@@ -19,6 +19,9 @@ except ImportError:
 def scan_all_opcodes(port: str = "/dev/ttyUSB0", baud: int = 9600):
     print("=" * 70)
     print(f" SCANNING ALL 256 SINGLE-BYTE YDS OPCODES ({port} @ {baud} Baud)")
+    print(" ⚠️  WARNING: DO NOT RUN WHILE ENGINE IS RUNNING!")
+    print("     Sweeping 0x00-0xFF hits active ECU diagnostic opcodes (cylinder")
+    print("     cut-off / ignition tests), causing engine misfires & hickups!")
     print("=" * 70)
 
     try:
