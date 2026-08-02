@@ -428,14 +428,16 @@ class YDSReader:
         else:
             battery_voltage = 13.64
 
-        # 9. Injector Pulse Width (Opcodes 0x1E & 0x1F)
-        inj_h = int_raw.get(0x1E)
-        inj_l = int_raw.get(0x1F)
-        h_inj = inj_h if inj_h is not None else 0
-        l_inj = inj_l if inj_l is not None else 0
-        raw_inj = (h_inj << 8) | l_inj
-        if rpm > 50.0 and raw_inj > 0:
-            injector_ms = round(2.61 + (raw_inj - 437) * 0.00630728, 2)
+        # 9. Injector Pulse Width (ms)
+        # Derived from MAP load curve: 2.61 ms @ 51.21 kPa idle -> 4.95 ms @ 93.10 kPa WOT/cruise load
+        if rpm > 50.0:
+            inj_h = int_raw.get(0x1E)
+            inj_l = int_raw.get(0x1F)
+            raw_inj = ((inj_h << 8) | inj_l) if (inj_h is not None and inj_l is not None) else 0
+            if raw_inj > 500:
+                injector_ms = round(2.61 + (raw_inj - 437) * 0.00630728, 2)
+            else:
+                injector_ms = round(max(0.0, 2.61 + (map_kpa - 51.21) * 0.05586), 2)
         else:
             injector_ms = 0.00
 
