@@ -306,16 +306,16 @@ $$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \m
 | `0xFE` | ECU Status | 8-bit | Status Flags | Payload `0x00` |
 | `0xFF` | ECU Model Sub-ID | 8-bit | Hardware Identification | `0x06` $\rightarrow$ **Yamaha 63P-01** |
 | `0xDE` / `0xD0` | Subsystem Unlock | 8-bit | Diagnostic Mode Flags | Payload `0x00` |
-| `0x91` / `0xF0` | Engine Temperature | 8-bit | $\text{Raw} > 100 \Rightarrow \text{°C} = \text{Raw} - 130.0$ else $\text{Raw} - 5.0$ | `0xA1` (161) $\rightarrow$ **31.0 °C / 87.8 °F** |
-| `0x1B` / `0xEF` | Intake Air Temperature | 8-bit | $\text{Raw} > 100 \Rightarrow \text{°C} = \text{Raw} - 101.4$ else $\text{Raw}$ | `0x7D` (125) $\rightarrow$ **23.6 °C / 74.5 °F** |
-| `0x00` / `0x01` | Engine Speed (RPM) | 16-bit | $\text{RPM} = (\text{High} \ll 8) \mid \text{Low}$ | `0x02B0` (688) $\rightarrow$ **688.0 r/min** |
-| `0x08` / `0x09` | Throttle Position (TPS) | 16-bit | $\text{V} = \text{Raw} \times 0.00097838$, $\text{deg} = (\text{Raw} - 700) \times 0.08333$ | `0x02B6` (694) $\rightarrow$ **0.679 V / -0.5 deg (0.0%)** |
-| `0x05` / `0x0B` | Manifold Pressure (MAP) | 8-bit | Stopped: $\text{Raw}_{05} \times 0.42639$, Running: $\text{Raw}_{0B} \times 0.33108$ | `0xE9` (233) $\rightarrow$ **99.35 kPa**, `0x8B` (139) $\rightarrow$ **46.02 kPa** |
-| `0x51` | Barometric Pressure | 8-bit | $\text{hPa} = \text{Raw} \times 4.2755$ | `0xE9` (233) $\rightarrow$ **996.2 hPa** |
-| `0x41` / `0x0D` | ISC Valve Opening | 8-bit | $\text{\%} = \text{Raw} / 1.7164$ | `0x73` (115) $\rightarrow$ **67.0 %** |
-| `0x0E` / `0x0F` | Oil Pressure | 16-bit | $\text{kPa} = ((\text{High} \ll 8) \mid \text{Low}) / 7.16$ | `0x0A43` (2627) $\rightarrow$ **366.8 kPa / 53.2 PSI** |
-| `0x04` / `0x40` | Battery Voltage | 16-bit | $\text{Volts} = ((\text{High} \ll 8) \mid \text{Low}) / 50.216$ | `0x027B` (635) $\rightarrow$ **12.64 V**, `0x02B7` (695) $\rightarrow$ **13.84 V** |
-| `0x1E` / `0x1F` | Fuel Injector Duration | 16-bit | $\text{ms} = ((\text{High} \ll 8) \mid \text{Low}) / 195.0$ | `0x01F7` (503) $\rightarrow$ **2.58 ms** |
+| `0x91` / `0xF0` | Engine Temperature | 8-bit | $\text{°C} = \text{Raw}_{91} - 5.0$ | `0x30` (48) $\rightarrow$ **43.0 °C / 109.4 °F** |
+| `0xEF` / `0x1B` | Intake Air Temperature | 8-bit | $\text{°C} = \text{Raw}_{EF} \times 0.9655 - 23.94$ | `0x33` (51) $\rightarrow$ **25.3 °C / 77.5 °F** |
+| `0x00` / `0x01` | Engine Speed (RPM) | 16-bit | $\text{RPM} = (\text{High} \ll 8) \mid \text{Low}$ | `0x0289` (649) $\rightarrow$ **649.0 r/min**, `0x0D6D` (3437) $\rightarrow$ **3437.0 r/min** |
+| `0x1D` | Throttle Position (TPS) | 8-bit | $\text{V} = 0.679 + (\text{Raw}_{1D} - 67) \times 0.014246$, $\text{deg} = -0.5 + (\text{Raw} - 67) \times 0.355738$ | `0x43` (67) $\rightarrow$ **0.679 V / -0.5 deg (0%)**, `0x80` (128) $\rightarrow$ **1.548 V / 21.2 deg (24.0%)** |
+| `0x0B` / `0x05` | Manifold Pressure (MAP) | 8-bit | Running: $\text{kPa} = 124.915 - (\text{Raw}_{0B} \times 0.530253)$ | `0x8B` (139) $\rightarrow$ **51.21 kPa**, `0x3B` (59) $\rightarrow$ **93.10 kPa** |
+| `0x05` | Barometric Pressure | 8-bit | $\text{hPa} = \text{Raw}_{05} \times 4.1556$ | `0xF1` (241) $\rightarrow$ **1001.5 hPa** |
+| `0x41` / `0x0D` | ISC Valve Opening | 8-bit | $\text{\%} = \text{Raw}_{41} / 1.703125$ | `0x6D` (109) $\rightarrow$ **64.0 %**, `0xA3` (163) $\rightarrow$ **96.0 %** |
+| `0x0E` / `0x0F` | Oil Pressure | 16-bit | $\text{kPa} = 347.4 + (\text{Raw}_{0E/0F} - 2549) \times 0.033739$ | `0x09F5` (2549) $\rightarrow$ **347.4 kPa / 50.4 PSI**, `0x1344` (4932) $\rightarrow$ **427.8 kPa / 62.6 PSI** |
+| `0x04` / `0x40` | Battery Voltage | 16-bit | $\text{Volts} = 13.64 + (\text{Raw}_{04/40} - 656) \times 0.031875$ | `0x0290` (656) $\rightarrow$ **13.64 V**, `0x02A0` (672) $\rightarrow$ **14.15 V** |
+| `0x1E` / `0x1F` | Fuel Injector Duration | 16-bit | $\text{ms} = 2.61 + (\text{Raw}_{1E/1F} - 437) \times 0.00630728$ | `0x01B5` (437) $\rightarrow$ **2.61 ms**, `0x0328` (808) $\rightarrow$ **4.95 ms** |
 | `0xF1` | Streaming Enable | 8-bit | Streaming Session Keep-Alive | Refresh every $\le 8$ seconds |
 
 ### D. Session Watchdog & Auto-Recovery
