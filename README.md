@@ -302,7 +302,7 @@ $$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \m
 | :---: | :--- | :---: | :--- | :--- |
 | `0x1C` | Diagnostic Sync / Heartbeat | 8-bit | Handshake & Watchdog Reset | Payload `0x03` |
 | `0xFD` | Diagnostic Session Unlock | 8-bit | Diagnostic Mode Unlock | Payload `0x00` |
-| `0xE8` / `0xE5` | Total Engine Hours | 16-bit | $\text{Hours} = ((\text{High} \ll 8) \mid \text{Low}) \times 1.00202$ | `0x01EF` (495) $\rightarrow$ **496.0 Hours** |
+| `0xE8` / `0xE5` | Total Engine Hours | 16-bit | $\text{Hours} = ((\text{High} \ll 8) \mid \text{Low}) \times 1.00687$ | `0x01EF` (495) $\rightarrow$ **498.4 Hours** |
 | `0xFE` | ECU Status | 8-bit | Status Flags | Payload `0x00` |
 | `0xFF` | ECU Model Sub-ID | 8-bit | Hardware Identification | `0x06` $\rightarrow$ **Yamaha 63P-01** |
 | `0xDE` / `0xD0` | Subsystem Unlock | 8-bit | Diagnostic Mode Flags | Payload `0x00` |

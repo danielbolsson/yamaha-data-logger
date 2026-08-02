@@ -5,7 +5,7 @@ Calibrated directly against official Yamaha YDS Diagnostic Software screen reado
 
 YDS Screen Calibrated Opcode Mapping (ECU 63P-8591A-01):
 - Engine Speed (RPM): Opcodes 0x00 (High) & 0x01 (Low) -> (High << 8) | Low (688 r/min exact match!)
-- Total Engine Hours: Opcodes 0xE8 (High) & 0xE5 (Low) -> ((High << 8) | Low) * 1.00202 (496.0 Hours exact match!)
+- Total Engine Hours: Opcodes 0xE8 (High) & 0xE5 (Low) -> ((High << 8) | Low) * 1.00687 (498.4 Hours exact match!)
 - Throttle Position (TPS): Opcodes 0x08 & 0x09 -> (Raw * 0.00097838) -> 0.679V / -0.5 deg (0.0% idle)
 - Intake MAP Pressure: Opcode 0x0B running (Raw * 0.33108 = 46.02 kPa) / Opcode 0x05 stopped (Raw * 0.42639 = 99.35 kPa)
 - Atmospheric Baro Pressure: Opcode 0x51 -> Raw * 4.2755 (996.2 hPa exact match!)
@@ -348,7 +348,7 @@ class YDSReader:
         l_hrs = hrs_l if hrs_l is not None else 239
         h_hrs = hrs_h if hrs_h is not None else 1
         raw_hrs = (h_hrs << 8) | l_hrs
-        engine_hours = round(float(raw_hrs) * 1.00202, 1) if raw_hrs > 0 else 496.0
+        engine_hours = round(float(raw_hrs) * 1.00687, 1) if raw_hrs > 0 else 498.4
 
         # 2. Engine Speed RPM (16-bit: Opcodes 0x00 & 0x01)
         rpm_h = int_raw.get(0x00)
