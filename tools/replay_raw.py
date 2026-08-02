@@ -54,7 +54,7 @@ def replay_raw_log():
 
     print("\n" + "=" * 90)
     print(f"  🎬 REPLAYING RAW YDS TELEMETRY -> {args.input}")
-    print(f"  Replay Speed: {args.speed}x | Export CSV: {args.export-csv if args.export_csv else 'None'}")
+    print(f"  Replay Speed: {args.speed}x | Export CSV: {args.export_csv if args.export_csv else 'None'}")
     print("=" * 90 + "\n")
 
     frames: List[Dict[str, Any]] = []
