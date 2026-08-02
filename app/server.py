@@ -89,6 +89,8 @@ async def telemetry_background_loop():
             data = await loop.run_in_executor(None, yds_reader_instance.read_telemetry)
 
             is_mock = cli_args.mock or (yds_reader_instance and yds_reader_instance.mock_mode)
+            is_replay = bool(cli_args.replay_file or (yds_reader_instance and yds_reader_instance.replay_file) or data.get("is_replay"))
+            is_simulation_or_replay = is_mock or is_replay
 
             # Read GPS snapshot
             gps_data = gps_reader_instance.read_gps(engine_rpm=data.get("rpm", 0.0)) if gps_reader_instance else {}
@@ -98,20 +100,20 @@ async def telemetry_background_loop():
             # Calculate Fuel Economy in Liters per Nautical Mile (L/NM) = Fuel Flow Rate (L/h) / Speed (KTS)
             fuel_economy_l_nm = round(fuel_lh / speed_kts, 2) if speed_kts > 0.3 and fuel_lh > 0 else 0.0
 
-            # Calculate real-time fuel consumption if running (live hardware mode only)
-            if data and data.get("status") == "ok" and not is_mock:
+            # Calculate real-time fuel consumption if running (live hardware mode only, skip for mock or replay)
+            if data and data.get("status") == "ok" and not is_simulation_or_replay:
                 if fuel_lh > 0.0:
                     consumed_delta = (fuel_lh * dt) / 3600.0
-                    new_rem = max(0.0, current_fuel_state["current_fuel_liters"] - consumed_delta)
-                    new_trip = current_fuel_state["trip_consumed_liters"] + consumed_delta
+                    new_rem = max(0.0, current_fuel_state.get("current_fuel_liters", 170.0) - consumed_delta)
+                    new_trip = current_fuel_state.get("trip_consumed_liters", 0.0) + consumed_delta
                     current_fuel_state = database.update_fuel_state(new_rem, trip_consumed=new_trip)
 
             # Attach fuel state and GPS telemetry to payload
             data.update({
-                "current_fuel_liters": current_fuel_state["current_fuel_liters"],
-                "tank_capacity_liters": current_fuel_state["tank_capacity_liters"],
-                "trip_consumed_liters": current_fuel_state["trip_consumed_liters"],
-                "fuel_percent": current_fuel_state["fuel_percent"],
+                "current_fuel_liters": current_fuel_state.get("current_fuel_liters", 170.0),
+                "tank_capacity_liters": current_fuel_state.get("tank_capacity_liters", 170.0),
+                "trip_consumed_liters": current_fuel_state.get("trip_consumed_liters", 0.0),
+                "fuel_percent": current_fuel_state.get("fuel_percent", 100.0),
                 "gps": gps_data,
                 "gps_speed_kts": speed_kts,
                 "gps_speed_kmh": gps_data.get("speed_kmh", 0.0),
@@ -126,8 +128,8 @@ async def telemetry_background_loop():
 
             latest_telemetry = data
 
-            # Log to SQLite database history every 1.0 second (live hardware mode only)
-            if not is_mock and (now - last_db_log_time) >= 1.0:
+            # Log to SQLite database history every 1.0 second (live hardware mode only, skip for mock or replay)
+            if not is_simulation_or_replay and (now - last_db_log_time) >= 1.0:
                 last_db_log_time = now
                 await loop.run_in_executor(None, database.log_telemetry_frame, data)
 
