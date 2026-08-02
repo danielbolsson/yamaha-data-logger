@@ -474,10 +474,10 @@ class YDSReader:
         }
 
         # 13. Fuel Rate Calculation (L/h)
-        # Formula: (RPM / 2 cycles/min) * (injector_ms / 1000 s) * 4 cyl * (injector_cc_min / 60 s/min) * (60 min/hr / 1000 cc/L)
+        # Formula: Fuel L/h = RPM * injector_ms * 0.001205
+        # Calibrated for Yamaha F150 (2.7L 4-cyl EFI): 2.04 L/h @ 649 RPM idle (2.61ms), 20.50 L/h @ 3437 RPM cruise (4.95ms), 61.5 L/h @ 5800 RPM WOT
         if rpm > 50.0 and injector_ms > 0.1:
-            fuel_lh = (rpm / 2.0) * (injector_ms / 1000.0) * num_cylinders * (injector_cc_min / 1000.0)
-            fuel_rate_lh = round(fuel_lh, 2)
+            fuel_rate_lh = round(rpm * injector_ms * 0.001205, 2)
         else:
             fuel_rate_lh = 0.0
 
