@@ -437,7 +437,6 @@ class YDSReader:
         }
 
         # 13. Fuel Rate Calculation (L/h)
-        # 13. Fuel Rate Calculation (L/h)
         # Physically calibrated for Yamaha F150 (2.7L 4-cyl EFI) accounting for 0.95 ms injector dead-time latency.
         # Yields ~1.5 L/h (0.4 GPH) @ Idle (650 RPM, 2.58ms) and ~19.3 L/h (5.1 GPH) @ 3440 RPM Cruise (4.91ms).
         if rpm > 50.0 and injector_ms > 0.95:
