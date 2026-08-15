@@ -468,35 +468,50 @@ class YDSReader:
         return round(rpm * (injector_ms - 0.95) * 0.00142, 2)
 
     def _generate_mock_telemetry(self) -> Dict[str, Any]:
-        """Generates realistic dynamic telemetry data for offline testing."""
+        """Generates realistic dynamic telemetry data normalized against real F150 recordings."""
         self._mock_sim_time += 0.2
         t = self._mock_sim_time
 
         cycle = math.sin(t * 0.15) * 0.5 + 0.5
-        noise = (random.random() - 0.5) * 30.0
+        noise = (random.random() - 0.5) * 20.0
         
-        rpm = round(743.0 + (cycle * 3800.0) + noise, 1)
-        if rpm < 700:
-            rpm = 720.0
+        # Smoothly cycle RPM between 650 RPM (idle) and ~3500-3800 RPM (cruise)
+        rpm = round(650.0 + (cycle * 2850.0) + noise, 1)
+        if rpm < 640.0:
+            rpm = 650.0
 
-        tps = round(max(0.0, min(100.0, (rpm - 750.0) / 42.0 + (random.random() * 2.0))), 1)
-        tps_volts = round(0.679 + (tps / 100.0) * 3.821, 3)
-        injector_ms = round(2.58 + (tps / 100.0) * 11.5 + (random.random() * 0.2), 2)
+        # Calibrated TPS (% and degrees) based on actual F150 cruise load curve (0% idle -> ~24% @ 3500 RPM)
+        tps = round(max(0.0, min(100.0, (rpm - 650.0) / 2850.0 * 24.0 + (random.random() * 0.5))), 1)
+        tps_deg = round(-0.5 + (tps / 100.0) * 90.5, 1)
+        tps_volts = round(0.679 + (tps / 100.0) * 3.65, 3)
+
+        # Injector pulse duration (2.58 ms @ idle -> 4.95 ms @ cruise)
+        injector_ms = round(2.58 + max(0.0, (rpm - 650.0) / 2850.0) * 2.37 + (random.random() - 0.5) * 0.06, 2)
+
+        # Oil Pressure (347.4 kPa / 50.4 PSI @ idle -> 427.8 kPa / 62.6 PSI @ cruise)
         if rpm > 300.0:
-            oil_pressure_kpa = round(347.4 + max(0.0, (rpm - 650.0) / 2800.0) * 80.4 + (noise / 8.0), 1)
+            oil_pressure_kpa = round(347.4 + max(0.0, (rpm - 650.0) / 2800.0) * 80.4 + (random.random() - 0.5) * 1.5, 1)
         else:
             oil_pressure_kpa = 0.0
         oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
 
-        if self._mock_engine_temp < 72.0:
-            self._mock_engine_temp += 0.08
-        engine_temp_c = round(self._mock_engine_temp + (math.sin(t * 0.05) * 0.5), 1)
+        # Engine and Intake Air Temperatures
+        engine_temp_c = round(43.0 + max(0.0, min(1.0, (rpm - 650.0) / 2800.0)) * 3.5 + (math.sin(t * 0.05) * 0.3), 1)
         engine_temp_f = round((engine_temp_c * 9.0 / 5.0) + 32.0, 1)
-        intake_temp_c = 21.6
-        intake_temp_f = 70.6
+        intake_temp_c = round(25.3 + max(0.0, min(1.0, (rpm - 650.0) / 2800.0)) * 2.6, 1)
+        intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
 
-        map_kpa = round(47.75 + (tps / 100.0) * 51.0 + (random.random() * 0.5), 2)
-        battery_voltage = round(13.77 + (math.sin(t * 0.3) * 0.1), 2)
+        # Intake MAP Pressure (51.2 kPa @ idle -> 93.1 kPa @ cruise) & Baro
+        map_kpa = round(51.21 + max(0.0, min(1.0, (rpm - 650.0) / 2800.0)) * 41.89 + (random.random() - 0.5) * 0.6, 2)
+        baro_hpa = 1001.5
+
+        # Battery / Alternator Voltage (13.64V @ idle -> 14.15V @ cruise)
+        battery_voltage = round(13.64 + max(0.0, min(1.0, (rpm - 650.0) / 2800.0)) * 0.51 + (random.random() - 0.5) * 0.02, 2)
+
+        # ISC Valve Opening % (64% @ idle -> 96% @ cruise)
+        isc_opening_pct = round(64.0 + max(0.0, min(1.0, (rpm - 650.0) / 2800.0)) * 32.0, 1)
+
+        # Fuel Flow Rate in L/h (~1.5 L/h idle -> ~19.3 L/h cruise)
         fuel_rate_lh = self.calculate_fuel_flow(rpm, injector_ms)
         self._mock_hours += 0.2 / 3600.0
 
@@ -519,8 +534,10 @@ class YDSReader:
             "intake_temp_f": intake_temp_f,
             "tps_percent": tps,
             "tps_volts": tps_volts,
+            "tps_deg": tps_deg,
+            "isc_opening_pct": isc_opening_pct,
             "map_kpa": map_kpa,
-            "baro_hpa": 986.9,
+            "baro_hpa": baro_hpa,
             "oil_pressure_kpa": oil_pressure_kpa,
             "oil_pressure_psi": oil_pressure_psi,
             "injector_ms": injector_ms,
