@@ -4,7 +4,7 @@ A real-time telemetry decoding engine and marine helm web dashboard for **Yamaha
 
 ## Dashboard
 
-![dashboard](images/dashboard.png)
+![dashboard](images/f150-dashboard-demo.gif)
 
 ---
 
