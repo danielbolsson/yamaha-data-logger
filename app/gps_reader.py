@@ -64,6 +64,10 @@ class GPSReader:
         self.last_clock_sync_time: float = 0.0
         self.clock_drift_seconds: float = 0.0
 
+        # Silent Connection & Watchdog State
+        self.last_rx_time: float = 0.0
+        self.last_watchdog_wake: float = 0.0
+
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
@@ -101,8 +105,20 @@ class GPSReader:
         try:
             logger.info(f"Opening GPS serial port {self.port} at {self.baudrate} baud...")
             self.ser = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
+
+            # Assert DTR and RTS modem control lines (required for USB CDC-ACM GNSS receivers)
+            self.ser.dtr = True
+            self.ser.rts = True
+            time.sleep(0.05)
+            self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
+
+            # Send u-blox / NMEA wake-up probe and enable core sentences
+            self._send_wakeup_sequence()
+
             self.is_connected = True
-            logger.info(f"GPS serial port {self.port} connected successfully.")
+            self.last_rx_time = time.time()
+            logger.info(f"GPS serial port {self.port} connected successfully with DTR/RTS asserted and wake-up sent.")
             return True
         except Exception as e:
             logger.error(f"Failed to open GPS serial port {self.port}: {e}")
@@ -114,6 +130,26 @@ class GPSReader:
                     pass
                 self.ser = None
             return False
+
+    def _send_wakeup_sequence(self):
+        """Sends wake-up probe and enables standard NMEA sentences on u-blox / NMEA GNSS receivers."""
+        if not self.ser or not getattr(self.ser, 'is_open', False):
+            return
+        try:
+            # 1. Newline wake-up pulse for sleeping GNSS processors
+            # 2. $PUBX,40 enable commands for RMC, GGA, VTG, GSA, GSV
+            wake_payload = (
+                b"\r\n"
+                b"$PUBX,40,RMC,0,1,0,0*47\r\n"
+                b"$PUBX,40,GGA,0,1,0,0*5A\r\n"
+                b"$PUBX,40,VTG,0,1,0,0*5E\r\n"
+                b"$PUBX,40,GSA,0,1,0,0*4E\r\n"
+                b"$PUBX,40,GSV,0,1,0,0*59\r\n"
+            )
+            self.ser.write(wake_payload)
+            self.ser.flush()
+        except Exception as e:
+            logger.debug(f"Could not send GPS wake-up sequence: {e}")
 
     def start(self):
         """Starts background thread polling NMEA serial lines continuously."""
@@ -141,7 +177,7 @@ class GPSReader:
             self.ser = None
 
     def _worker_loop(self):
-        """Background thread reading NMEA lines continuously."""
+        """Background thread reading NMEA lines continuously with silent connection watchdog."""
         while not self._stop_event.is_set():
             if self.mock_mode:
                 time.sleep(0.2)
@@ -152,6 +188,25 @@ class GPSReader:
                 time.sleep(1.0)
                 continue
 
+            # 5-second RX watchdog: if port is open but 0 valid bytes arrived for > 5s, re-assert DTR & wake-up
+            now = time.time()
+            if self.last_rx_time > 0 and (now - self.last_rx_time) > 5.0:
+                if (now - self.last_watchdog_wake) > 5.0:
+                    self.last_watchdog_wake = now
+                    logger.warning(
+                        f"GPS watchdog: No NMEA data received on {self.port} for {now - self.last_rx_time:.1f}s. "
+                        "Re-asserting DTR/RTS and sending wake-up sequence..."
+                    )
+                    try:
+                        self.ser.dtr = True
+                        self.ser.rts = True
+                        self.ser.reset_input_buffer()
+                        self._send_wakeup_sequence()
+                    except Exception:
+                        logger.warning(f"GPS watchdog: Serial port unresponsive. Reconnecting {self.port}...")
+                        self.close()
+                        continue
+
             try:
                 line_bytes = self.ser.readline()
                 if not line_bytes:
@@ -161,6 +216,7 @@ class GPSReader:
                 line = line_bytes.decode('ascii', errors='ignore').strip()
                 idx = line.find('$')
                 if idx >= 0:
+                    self.last_rx_time = time.time()
                     self.parse_nmea_sentence(line[idx:])
 
             except Exception as e:
