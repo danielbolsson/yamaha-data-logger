@@ -78,6 +78,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const batteryVal = document.getElementById("battery-val");
     const battStatusText = document.getElementById("batt-status-text");
+    const oilVal = document.getElementById("oil-val");
+    const oilPsiVal = document.getElementById("oil-psi-val");
     const mapVal = document.getElementById("map-val");
     const baroVal = document.getElementById("baro-val");
     const injectorVal = document.getElementById("injector-val");
@@ -608,7 +610,20 @@ document.addEventListener("DOMContentLoaded", () => {
             battStatusText.style.color = "#8a9bb0";
         }
 
-        // 5. Intake MAP Pressure & Baro
+        // 5. Oil Pressure & Intake MAP / Baro
+        const oilKpa = data.oil_pressure_kpa !== undefined ? data.oil_pressure_kpa : 347.4;
+        const oilPsi = data.oil_pressure_psi !== undefined ? data.oil_pressure_psi : (oilKpa * 0.145038);
+        if (oilVal) {
+            oilVal.innerText = oilKpa.toFixed(1);
+            if (rpm > 300 && oilKpa < 100) {
+                oilVal.className = "metric-value highlight-red";
+            } else if (oilKpa >= 200) {
+                oilVal.className = "metric-value highlight-green";
+            } else {
+                oilVal.className = "metric-value highlight-amber";
+            }
+        }
+        if (oilPsiVal) oilPsiVal.innerText = `${oilPsi.toFixed(1)} PSI`;
         if (mapVal) mapVal.innerText = (data.map_kpa || 99.09).toFixed(2);
         if (baroVal) baroVal.innerText = `${(data.baro_hpa || 990.9).toFixed(1)} hPa`;
 

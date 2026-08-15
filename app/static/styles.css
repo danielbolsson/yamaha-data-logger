@@ -494,6 +494,16 @@ body.helm-theme {
     color: var(--accent-amber);
 }
 
+.metric-value.highlight-green {
+    color: var(--accent-green);
+    text-shadow: var(--glow-green);
+}
+
+.metric-value.highlight-red {
+    color: var(--accent-red);
+    text-shadow: var(--glow-red);
+}
+
 .metric-unit {
     font-family: var(--font-digital);
     font-size: 0.8rem;
