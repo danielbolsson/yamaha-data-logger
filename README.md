@@ -302,20 +302,20 @@ $$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \m
 | :---: | :--- | :---: | :--- | :--- |
 | `0x1C` | Diagnostic Sync / Heartbeat | 8-bit | Handshake & Watchdog Reset | Payload `0x03` |
 | `0xFD` | Diagnostic Session Unlock | 8-bit | Diagnostic Mode Unlock | Payload `0x00` |
-| `0xE8` / `0xE5` | Total Engine Hours | 16-bit | $\text{Hours} = ((\text{High} \ll 8) \mid \text{Low}) \times 1.00687$ | `0x01EF` (495) $\rightarrow$ **498.4 Hours** |
+| `0xE8` / `0xE9` | Total Engine Hours | 16-bit | $\text{Hours} = ((\text{High} \ll 8) \mid \text{Low}) \times 1.474556$ | `0x0152` (338) $\rightarrow$ **498.4 Hours** |
 | `0xFE` | ECU Status | 8-bit | Status Flags | Payload `0x00` |
-| `0xFF` | ECU Model Sub-ID | 8-bit | Hardware Identification | `0x06` $\rightarrow$ **Yamaha 63P-01** |
+| `0xFF` / `0x02` | ECU Model Sub-ID | 8-bit | Hardware Identification | `0x06` $\rightarrow$ **Yamaha 63P-01** |
 | `0xDE` / `0xD0` | Subsystem Unlock | 8-bit | Diagnostic Mode Flags | Payload `0x00` |
-| `0x91` / `0xF0` | Engine Temperature | 8-bit | $\text{°C} = \text{Raw}_{91} - 5.0$ | `0x30` (48) $\rightarrow$ **43.0 °C / 109.4 °F** |
-| `0xEF` / `0x1B` | Intake Air Temperature | 8-bit | $\text{°C} = \text{Raw}_{EF} \times 0.9655 - 23.94$ | `0x33` (51) $\rightarrow$ **25.3 °C / 77.5 °F** |
+| `0x91` / `0xF0` | Engine Temperature | 8-bit | $\text{°C} = \text{Raw} - 5.0$ | `0x30` (48) $\rightarrow$ **43.0 °C / 109.4 °F** |
+| `0xEF` / `0x1B` | Intake Air Temperature | 8-bit | $\text{°C} = (\text{Raw} \times 0.5) - 0.2$ | `0x33` (51) $\rightarrow$ **25.3 °C / 77.5 °F** |
 | `0x00` / `0x01` | Engine Speed (RPM) | 16-bit | $\text{RPM} = (\text{High} \ll 8) \mid \text{Low}$ | `0x0289` (649) $\rightarrow$ **649.0 r/min**, `0x0D6D` (3437) $\rightarrow$ **3437.0 r/min** |
-| `0x1D` | Throttle Position (TPS) | 8-bit | $\text{V} = 0.679 + (\text{Raw}_{1D} - 67) \times 0.014246$, $\text{deg} = -0.5 + (\text{Raw} - 67) \times 0.355738$ | `0x43` (67) $\rightarrow$ **0.679 V / -0.5 deg (0%)**, `0x80` (128) $\rightarrow$ **1.548 V / 21.2 deg (24.0%)** |
-| `0x0B` / `0x05` | Manifold Pressure (MAP) | 8-bit | Running: $\text{kPa} = 124.915 - (\text{Raw}_{0B} \times 0.530253)$ | `0x8B` (139) $\rightarrow$ **51.21 kPa**, `0x3B` (59) $\rightarrow$ **93.10 kPa** |
-| `0x05` | Barometric Pressure | 8-bit | $\text{hPa} = \text{Raw}_{05} \times 4.1556$ | `0xF1` (241) $\rightarrow$ **1001.5 hPa** |
-| `0x41` / `0x0D` | ISC Valve Opening | 8-bit | $\text{\%} = \text{Raw}_{41} / 1.703125$ | `0x6D` (109) $\rightarrow$ **64.0 %**, `0xA3` (163) $\rightarrow$ **96.0 %** |
-| `0x0E` / `0x0F` | Oil Pressure | 16-bit | $\text{kPa} = 347.4 + (\text{Raw}_{0E/0F} - 2549) \times 0.033739$ | `0x09F5` (2549) $\rightarrow$ **347.4 kPa / 50.4 PSI**, `0x1344` (4932) $\rightarrow$ **427.8 kPa / 62.6 PSI** |
-| `0x04` / `0x40` | Battery Voltage | 16-bit | $\text{Volts} = 13.64 + (\text{Raw}_{04/40} - 656) \times 0.031875$ | `0x0290` (656) $\rightarrow$ **13.64 V**, `0x02A0` (672) $\rightarrow$ **14.15 V** |
-| `0x1E` / `0x1F` | Fuel Injector Duration | 16-bit | $\text{ms} = 2.61 + (\text{Raw}_{1E/1F} - 437) \times 0.00630728$ | `0x01B5` (437) $\rightarrow$ **2.61 ms**, `0x0328` (808) $\rightarrow$ **4.95 ms** |
+| `0x08` / `0x09` (`0x1D`) | Throttle Position (TPS) | 16-bit / 8-bit | Primary (16-bit): $\text{V} = 0.679 + (\text{Raw} - 747) \times 0.03476$, $\text{deg} = -0.5 + (\text{Raw} - 747) \times 0.868$<br>Fallback (8-bit `0x1D`): $\text{V} = 0.679 + (\text{Raw} - 123) \times 0.1738$, $\text{deg} = -0.5 + (\text{Raw} - 123) \times 4.34$<br>$\text{\%} = \text{clamp}((\text{deg} + 0.5) / 90.5 \times 100, 0, 100)$ | `0x02EB` (747) / `0x7B` (123) $\rightarrow$ **0.679 V / -0.5 deg (0.0%)** |
+| `0x0B` / `0x05` | Manifold Pressure (MAP) | 8-bit | Running: $\text{kPa} = 123.994 - (\text{Raw} \times 0.523625)$ | `0x8B` (139) $\rightarrow$ **51.21 kPa**, `0x3B` (59) $\rightarrow$ **93.10 kPa** |
+| `0x05` / `0x51` | Barometric Pressure | 8-bit | $\text{hPa} = \text{Raw} \times 4.1556$ | `0xF1` (241) $\rightarrow$ **1001.5 hPa** |
+| `0x41` / `0x0D` | ISC Valve Opening | 8-bit | $\text{\%} = (\text{Raw} - 1) / 1.6875$ | `0x6D` (109) $\rightarrow$ **64.0 %**, `0xA3` (163) $\rightarrow$ **96.0 %** |
+| `0x0E` / `0x0F` | Oil Pressure | 16-bit | $\text{kPa} = 258.59 + (\text{Raw} \times 0.034462)$ | `0x0A11` (2577) $\rightarrow$ **347.4 kPa / 50.4 PSI** |
+| `0x02` / `0x03` (`0x04` / `0x40`) | Battery Voltage | 16-bit | $\text{Volts} = 13.0620 + (\text{Raw} \times 0.00154545)$ | `0x0176` (374) $\rightarrow$ **13.64 V** |
+| `0x0E` / `0x0F` | Fuel Injector Duration | 16-bit | $\text{ms} = \text{Raw} / 1000.0$ | `0x0A02` (2562) $\rightarrow$ **2.56 ms** |
 | `0xF1` | Streaming Enable | 8-bit | Streaming Session Keep-Alive | Refresh every $\le 8$ seconds |
 
 ### D. Session Watchdog & Auto-Recovery
