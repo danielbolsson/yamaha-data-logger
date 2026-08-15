@@ -6,7 +6,7 @@ Calibrated directly against official Yamaha YDS Diagnostic Software screen reado
 YDS Screen Calibrated Opcode Mapping (ECU 63P-8591A-01):
 - Engine Speed (RPM): Opcodes 0x00 (High) & 0x01 (Low) -> (High << 8) | Low (688 r/min exact match!)
 - Total Engine Hours: Opcodes 0xE8 (High) & 0xE9 (Low) -> ((High << 8) | Low) * 1.474556 (498.4 Hours exact match!)
-- Throttle Position (TPS): Opcodes 0x08 & 0x09 (16-bit) / 0x1D (8-bit) -> 0.679V / -0.5 deg (0.0% idle)
+- Throttle Position (TPS): Opcodes 0x08 & 0x09 (16-bit) -> 0.679V / -0.5 deg (0.0% idle)
 - Intake MAP Pressure: Opcode 0x0B running / 0x05 stopped -> 123.994 - (Raw * 0.523625) kPa
 - Atmospheric Baro Pressure: Opcode 0x05 / 0x51 -> Raw * 4.1556 (1001.5 hPa exact match!)
 - Oil Pressure: Opcodes 0x0E (High) & 0x0F (Low) -> 258.59 + (Raw * 0.034462) kPa
@@ -80,7 +80,6 @@ class YDSReader:
             "hours_low": 0xE9,     # Low byte -> Raw * 1.474556 = 498.4 Hours
             "tps_high": 0x08,      # High byte
             "tps_low": 0x09,       # Low byte -> 0.679V / -0.5 deg (0.0% idle)
-            "tps_fallback": 0x1D,  # 8-bit fallback TPS opcode
             "isc_valve": 0x41,     # ISC valve opening (0x41 / 0x0D)
             "map_pressure": 0x0B,  # Intake MAP pressure (0x0B / 0x05)
             "baro_pressure": 0x05, # Barometric pressure (0x05 / 0x51)
@@ -358,18 +357,13 @@ class YDSReader:
         raw_rpm = (h_val << 8) | l_val
         rpm = round(float(raw_rpm), 1)
 
-        # 3. Throttle Position TPS % & Voltage (Consecutive Opcodes 0x08 & 0x09 / 0x1D)
+        # 3. Throttle Position TPS % & Voltage (16-bit: Consecutive Opcodes 0x08 & 0x09)
         tps_h = int_raw.get(0x08)
         tps_l = int_raw.get(0x09)
-        raw_tps_1d = int_raw.get(0x1D)
         if tps_h is not None and tps_l is not None:
             raw_tps = (tps_h << 8) | tps_l
             tps_volts = round(0.679 + (raw_tps - 747) * 0.03476, 3)
             tps_deg = round(-0.5 + (raw_tps - 747) * 0.868, 1)
-            tps_pct = round(max(0.0, min(100.0, (tps_deg + 0.5) / 90.5 * 100.0)), 1)
-        elif raw_tps_1d is not None and raw_tps_1d > 0:
-            tps_volts = round(0.679 + (raw_tps_1d - 123) * 0.1738, 3)
-            tps_deg = round(-0.5 + (raw_tps_1d - 123) * 4.34, 1)
             tps_pct = round(max(0.0, min(100.0, (tps_deg + 0.5) / 90.5 * 100.0)), 1)
         else:
             tps_volts = 0.679
