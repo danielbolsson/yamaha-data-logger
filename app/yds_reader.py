@@ -482,7 +482,10 @@ class YDSReader:
         tps = round(max(0.0, min(100.0, (rpm - 750.0) / 42.0 + (random.random() * 2.0))), 1)
         tps_volts = round(0.679 + (tps / 100.0) * 3.821, 3)
         injector_ms = round(2.58 + (tps / 100.0) * 11.5 + (random.random() * 0.2), 2)
-        oil_pressure_kpa = round(357.0 + (rpm / 100.0) * 2.5, 1)
+        if rpm > 300.0:
+            oil_pressure_kpa = round(347.4 + max(0.0, (rpm - 650.0) / 2800.0) * 80.4 + (noise / 8.0), 1)
+        else:
+            oil_pressure_kpa = 0.0
         oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
 
         if self._mock_engine_temp < 72.0:
