@@ -314,13 +314,13 @@ $$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \m
 | `0x05` / `0x51` | Barometric Pressure | 8-bit | $\text{hPa} = \text{Raw} \times 4.1556$ | `0xF1` (241) $\rightarrow$ **1001.5 hPa** |
 | `0x41` / `0x0D` | ISC Valve Opening | 8-bit | $\text{\%} = (\text{Raw} - 1) / 1.6875$ | `0x6D` (109) $\rightarrow$ **64.0 %**, `0xA3` (163) $\rightarrow$ **96.0 %** |
 | `0x0E` / `0x0F` | Oil Pressure | 16-bit | $\text{kPa} = 258.59 + (\text{Raw} \times 0.034462)$ | `0x0A11` (2577) $\rightarrow$ **347.4 kPa / 50.4 PSI** |
-| `0x02` / `0x03` (`0x04` / `0x40`) | Battery Voltage | 16-bit | $\text{Volts} = 13.0620 + (\text{Raw} \times 0.00154545)$ | `0x0176` (374) $\rightarrow$ **13.64 V** |
+| `0x02` / `0x03` | Battery Voltage | 16-bit | $\text{Volts} = 13.0620 + (\text{Raw} \times 0.00154545)$ | `0x0176` (374) $\rightarrow$ **13.64 V** |
 | `0x0E` / `0x0F` | Fuel Injector Duration | 16-bit | $\text{ms} = \text{Raw} / 1000.0$ | `0x0A02` (2562) $\rightarrow$ **2.56 ms** |
 | `0xF1` | Streaming Enable | 8-bit | Streaming Session Keep-Alive | Refresh every $\le 8$ seconds |
 
 ### D. Session Watchdog & Auto-Recovery
 * The Yamaha ECU maintains an internal **45-second diagnostic session watchdog timer**. If no keep-alive command (`0xF1`) is received for 45 seconds, the ECU drops back to non-diagnostic mode.
-* [yds_reader.py](file:///home/daniel/src/yamaha-data-logger/yds_reader.py) automatically handles periodic 8-second keep-alive heartbeats and includes automatic re-activation recovery if the connection is ever interrupted.
+* [app/yds_reader.py](file:///home/daniel/src/yamaha-data-logger/app/yds_reader.py) automatically handles periodic 8-second keep-alive heartbeats and includes automatic re-activation recovery if the connection is ever interrupted.
 
 ---
 

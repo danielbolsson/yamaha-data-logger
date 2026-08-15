@@ -191,10 +191,10 @@ def log_raw_telemetry():
                     rpm_l = raw_vals.get(0x01, 0)
                     calc_rpm = (rpm_h << 8) | rpm_l
 
-                    batt_h = raw_vals.get(0x04, 0)
-                    batt_l = raw_vals.get(0x40, 0)
+                    batt_h = raw_vals.get(0x02, 0)
+                    batt_l = raw_vals.get(0x03, 0)
                     raw_batt = (batt_h << 8) | batt_l
-                    calc_batt = round(raw_batt / 50.216, 2) if raw_batt > 0 else 0.0
+                    calc_batt = round(13.0620 + (raw_batt * 0.00154545), 2) if raw_batt > 0 else 0.0
 
                     print(f"[{frame_count:05d} | {record['elapsed']:6.1f}s] RPM: {calc_rpm:4d} r/min | Batt: {calc_batt:5.2f}V | Opcodes Polled: {len(raw_vals):3d}/{len(target_opcodes)}", end="\r")
 

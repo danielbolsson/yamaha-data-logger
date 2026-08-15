@@ -5,15 +5,15 @@ Calibrated directly against official Yamaha YDS Diagnostic Software screen reado
 
 YDS Screen Calibrated Opcode Mapping (ECU 63P-8591A-01):
 - Engine Speed (RPM): Opcodes 0x00 (High) & 0x01 (Low) -> (High << 8) | Low (688 r/min exact match!)
-- Total Engine Hours: Opcodes 0xE8 (High) & 0xE5 (Low) -> ((High << 8) | Low) * 1.00687 (498.4 Hours exact match!)
-- Throttle Position (TPS): Opcodes 0x08 & 0x09 -> (Raw * 0.00097838) -> 0.679V / -0.5 deg (0.0% idle)
-- Intake MAP Pressure: Opcode 0x0B running (Raw * 0.33108 = 46.02 kPa) / Opcode 0x05 stopped (Raw * 0.42639 = 99.35 kPa)
-- Atmospheric Baro Pressure: Opcode 0x51 -> Raw * 4.2755 (996.2 hPa exact match!)
-- Oil Pressure: Opcodes 0x0E (High) & 0x0F (Low) / 7.16 -> 366.8 kPa / 53.2 psi (0.0 kPa stopped)
-- Battery Voltage: Opcodes 0x04 (High) & 0x40 (Low) / 50.216 -> 12.64V stopped / 13.84V running exact match!
-- Engine Temperature: Opcode 0x91 / 0xF0 -> Raw > 100 ? Raw - 130.0 : Raw - 5.0 (31.0 °C / 87.8 °F exact match!)
-- Intake Temperature: Opcode 0x1B / 0xEF -> Raw > 100 ? Raw - 101.4 : Raw (23.6 °C / 74.5 °F exact match!)
-- Fuel Injection Duration: Opcodes 0x1E & 0x1F -> Raw / 195.0 = 2.58 ms running (0.00 ms stopped)
+- Total Engine Hours: Opcodes 0xE8 (High) & 0xE9 (Low) -> ((High << 8) | Low) * 1.474556 (498.4 Hours exact match!)
+- Throttle Position (TPS): Opcodes 0x08 & 0x09 (16-bit) / 0x1D (8-bit) -> 0.679V / -0.5 deg (0.0% idle)
+- Intake MAP Pressure: Opcode 0x0B running / 0x05 stopped -> 123.994 - (Raw * 0.523625) kPa
+- Atmospheric Baro Pressure: Opcode 0x05 / 0x51 -> Raw * 4.1556 (1001.5 hPa exact match!)
+- Oil Pressure: Opcodes 0x0E (High) & 0x0F (Low) -> 258.59 + (Raw * 0.034462) kPa
+- Battery Voltage: Opcodes 0x02 (High) & 0x03 (Low) -> 13.0620 + (Raw * 0.00154545) V
+- Engine Temperature: Opcode 0x91 / 0xF0 -> Raw - 5.0 °C (43.0 °C / 109.4 °F exact match!)
+- Intake Temperature: Opcode 0xEF / 0x1B -> (Raw * 0.5) - 0.2 °C (25.3 °C / 77.5 °F exact match!)
+- Fuel Injection Duration: Opcodes 0x0E & 0x0F -> Raw / 1000.0 ms (2.56 ms idle, 4.95 ms cruise)
 """
 
 import os
@@ -74,22 +74,22 @@ class YDSReader:
         self.opcodes = {
             "rpm_high": 0x00,      # High byte (0x00 when stopped)
             "rpm_low": 0x01,       # Low byte (0x00 when stopped)
+            "batt_high": 0x02,     # High byte (0x01 @ idle, 0x02 @ cruise)
+            "batt_low": 0x03,      # Low byte -> 13.0620 + (Raw * 0.00154545) V
             "hours_high": 0xE8,    # High byte
-            "hours_low": 0xE9,     # Low byte (0x52) -> (0x0152 -> 338 * 1.47455) -> 498.4 Hours
+            "hours_low": 0xE9,     # Low byte -> Raw * 1.474556 = 498.4 Hours
             "tps_high": 0x08,      # High byte
-            "tps_low": 0x09,       # Low byte (0x02B3 -> 0.679V)
-            "tps_voltage": 0x0A,   # Analog TPS Voltage
-            "isc_valve": 0x0D,     # 0x0D = 80 -> 40.0% opening
-            "map_pressure": 0x0B,  # 0x0B = 137 -> 53.18 kPa
-            "baro_pressure": 0x51, # Barometric pressure
+            "tps_low": 0x09,       # Low byte -> 0.679V / -0.5 deg (0.0% idle)
+            "tps_fallback": 0x1D,  # 8-bit fallback TPS opcode
+            "isc_valve": 0x41,     # ISC valve opening (0x41 / 0x0D)
+            "map_pressure": 0x0B,  # Intake MAP pressure (0x0B / 0x05)
+            "baro_pressure": 0x05, # Barometric pressure (0x05 / 0x51)
             "oil_high": 0x0E,      # High byte
-            "oil_low": 0x0F,       # Low byte
-            "batt_high": 0x02,     # High byte (0x02)
-            "batt_low": 0x03,      # Low byte (0xE9) -> 0x02E9 = 745 -> 14.9V
-            "engine_temp": 0xF0,   # 0xF0 = 54 -> 54.0 °C / 129.2 °F
-            "intake_temp": 0xEF,   # 0xEF = 51 -> 51.0 °C / 123.8 °F
-            "inj_high": 0x1E,      # 0x01
-            "inj_low": 0x1F,       # 0xF7 -> 0.00 ms (engine off)
+            "oil_low": 0x0F,       # Low byte -> 258.59 + (Raw * 0.034462) kPa
+            "inj_high": 0x0E,      # Microsecond pulse width high byte
+            "inj_low": 0x0F,       # Microsecond pulse width low byte -> Raw / 1000.0 ms
+            "engine_temp": 0x91,   # Engine Temp (0x91 / 0xF0) -> Raw - 5.0 °C
+            "intake_temp": 0xEF,   # Intake Temp (0xEF / 0x1B) -> (Raw * 0.5) - 0.2 °C
             "warnings": 0x1C       # Warning & init sync opcode
         }
 
@@ -397,9 +397,9 @@ class YDSReader:
         oil_pressure_kpa = round(258.59 + (raw_oil * 0.034462), 1) if raw_oil > 0 else 347.4
         oil_pressure_psi = round(oil_pressure_kpa * 0.145038, 1)
 
-        # 8. Battery Voltage (16-bit: Consecutive Opcodes 0x02 & 0x03 / 0x04 & 0x40)
-        batt_h = int_raw.get(0x02) if int_raw.get(0x02) is not None else int_raw.get(0x04)
-        batt_l = int_raw.get(0x03) if int_raw.get(0x03) is not None else int_raw.get(0x40)
+        # 8. Battery Voltage (16-bit: Consecutive Opcodes 0x02 & 0x03)
+        batt_h = int_raw.get(0x02)
+        batt_l = int_raw.get(0x03)
         h_batt = batt_h if batt_h is not None else 1
         l_batt = batt_l if batt_l is not None else 118
         raw_batt = (h_batt << 8) | l_batt
