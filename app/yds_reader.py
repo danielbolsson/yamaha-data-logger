@@ -11,7 +11,7 @@ YDS Screen Calibrated Opcode Mapping (ECU 63P-8591A-01):
 - Atmospheric Baro Pressure: Opcode 0x05 / 0x51 -> Raw * 4.1556 (1001.5 hPa exact match!)
 - Oil Pressure: Opcodes 0x0E (High) & 0x0F (Low) -> 258.59 + (Raw * 0.034462) kPa
 - Battery Voltage: Opcodes 0x02 (High) & 0x03 (Low) -> 13.0620 + (Raw * 0.00154545) V
-- Engine Temperature: Opcode 0x91 -> Raw - 5.0 °C (43.0 °C / 109.4 °F exact match!)
+- Engine Temperature: Opcode 0x91 -> Raw °F converted to °C ((Raw - 32) * 5 / 9)
 - Intake Temperature: Opcode 0xEF / 0x1B -> (Raw * 0.5) - 0.2 °C (25.3 °C / 77.5 °F exact match!)
 - Fuel Injection Duration: Opcodes 0x0E & 0x0F -> Raw / 1000.0 ms (2.56 ms idle, 4.95 ms cruise)
 """
@@ -87,7 +87,7 @@ class YDSReader:
             "oil_low": 0x0F,       # Low byte -> 258.59 + (Raw * 0.034462) kPa
             "inj_high": 0x0E,      # Microsecond pulse width high byte
             "inj_low": 0x0F,       # Microsecond pulse width low byte -> Raw / 1000.0 ms
-            "engine_temp": 0x91,   # Engine Temp (0x91) -> Raw - 5.0 °C
+            "engine_temp": 0x91,   # Engine Temp (0x91) in °F -> (Raw - 32) * 5 / 9 °C
             "intake_temp": 0xEF,   # Intake Temp (0xEF / 0x1B) -> (Raw * 0.5) - 0.2 °C
             "warnings": 0x1C       # Warning & init sync opcode
         }
@@ -408,10 +408,14 @@ class YDSReader:
         else:
             injector_ms = 2.61 if rpm > 50.0 else 0.00
 
-        # 10. Engine Temperature (Opcode 0x91)
+        # 10. Engine Temperature (Opcode 0x91) - Raw value in Fahrenheit converted to Celsius
         raw_eng_temp = int_raw.get(0x91)
-        engine_temp_c = round(float(raw_eng_temp) - 5.0, 1) if (raw_eng_temp is not None and raw_eng_temp > 0) else 20.0
-        engine_temp_f = round((engine_temp_c * 9.0 / 5.0) + 32.0, 1)
+        if raw_eng_temp is not None and raw_eng_temp > 0:
+            engine_temp_f = round(float(raw_eng_temp), 1)
+            engine_temp_c = round((engine_temp_f - 32.0) * 5.0 / 9.0, 1)
+        else:
+            engine_temp_c = 20.0
+            engine_temp_f = 68.0
 
         # 11. Intake Air Temperature (Opcode 0xEF / 0x1B)
         raw_intake_temp = int_raw.get(0xEF) or int_raw.get(0x1B)

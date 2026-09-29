@@ -306,7 +306,7 @@ $$\text{Frame Sequence: } \mathtt{0x1C} \rightarrow \mathtt{0xFD} \rightarrow \m
 | `0xFE` | ECU Status | 8-bit | Status Flags | Payload `0x00` |
 | `0xFF` / `0x02` | ECU Model Sub-ID | 8-bit | Hardware Identification | `0x06` $\rightarrow$ **Yamaha 63P-01** |
 | `0xDE` / `0xD0` | Subsystem Unlock | 8-bit | Diagnostic Mode Flags | Payload `0x00` |
-| `0x91` | Engine Temperature | 8-bit | $\text{°C} = \text{Raw} - 5.0$ | `0x19` (25) $\rightarrow$ **20.0 °C / 68.0 °F**, `0x30` (48) $\rightarrow$ **43.0 °C / 109.4 °F** |
+| `0x91` | Engine Temperature | 8-bit | $\text{°C} = (\text{Raw}_{°F} - 32) \times \frac{5}{9}$ | `0x44` (68 °F) $\rightarrow$ **20.0 °C**, `0x6D` (109 °F) $\rightarrow$ **42.8 °C** |
 | `0xEF` / `0x1B` | Intake Air Temperature | 8-bit | $\text{°C} = (\text{Raw} \times 0.5) - 0.2$ | `0x33` (51) $\rightarrow$ **25.3 °C / 77.5 °F** |
 | `0x08` / `0x09` | Throttle Position (TPS) | 16-bit | $\text{V} = 0.679 + (\text{Raw} - 747) \times 0.03476$, $\text{deg} = -0.5 + (\text{Raw} - 747) \times 0.868$<br>$\text{\%} = \text{clamp}((\text{deg} + 0.5) / 90.5 \times 100, 0, 100)$ | `0x02EB` (747) $\rightarrow$ **0.679 V / -0.5 deg (0.0%)**, `0x0304` (772) $\rightarrow$ **1.548 V / 21.2 deg (24.0%)** |
 | `0x0B` / `0x05` | Manifold Pressure (MAP) | 8-bit | Running: $\text{kPa} = 123.994 - (\text{Raw} \times 0.523625)$ | `0x8B` (139) $\rightarrow$ **51.21 kPa**, `0x3B` (59) $\rightarrow$ **93.10 kPa** |
