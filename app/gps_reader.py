@@ -7,7 +7,6 @@ Course Over Ground (Heading deg), Satellites in View, and Fix Status.
 
 import os
 import time
-import math
 import random
 import logging
 import threading
