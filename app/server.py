@@ -34,6 +34,7 @@ logger = logging.getLogger("yds_server")
 # Global State
 active_websockets: Set[WebSocket] = set()
 latest_telemetry: dict = {}
+latest_telemetry_json: str = "{}"
 yds_reader_instance: YDSReader = None
 gps_reader_instance: GPSReader = None
 polling_task: asyncio.Task = None
@@ -69,7 +70,7 @@ async def telemetry_background_loop():
     Asynchronous background loop polling ECU telemetry at 5 Hz (every 200ms),
     calculating fuel consumption, logging frames to SQLite, and broadcasting updates.
     """
-    global latest_telemetry, active_websockets, yds_reader_instance, current_fuel_state, last_polling_time, last_db_log_time
+    global latest_telemetry, latest_telemetry_json, active_websockets, yds_reader_instance, current_fuel_state, last_polling_time, last_db_log_time
     logger.info("Starting background YDS polling loop (5 Hz)...")
 
     # Connect to serial port / init reader
@@ -127,6 +128,7 @@ async def telemetry_background_loop():
             })
 
             latest_telemetry = data
+            latest_telemetry_json = json.dumps(data)
 
             # Log to SQLite database history every 1.0 second (live hardware mode only, skip for mock or replay)
             if not is_simulation_or_replay and (now - last_db_log_time) >= 1.0:
@@ -135,12 +137,11 @@ async def telemetry_background_loop():
 
             # Broadcast to active WebSocket connections
             if active_websockets:
-                payload = json.dumps(data)
                 disconnected_clients = set()
 
                 for ws in list(active_websockets):
                     try:
-                        await ws.send_text(payload)
+                        await ws.send_text(latest_telemetry_json)
                     except Exception as ws_err:
                         logger.debug(f"Client disconnected or send failed: {ws_err}")
                         disconnected_clients.add(ws)
@@ -297,9 +298,9 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
     logger.info(f"WebSocket client connected from {websocket.client.host}. Total clients: {len(active_websockets)}")
 
     # Send initial telemetry snapshot immediately
-    if latest_telemetry:
+    if latest_telemetry_json and latest_telemetry_json != "{}":
         try:
-            await websocket.send_text(json.dumps(latest_telemetry))
+            await websocket.send_text(latest_telemetry_json)
         except Exception:
             pass
 
