@@ -11,7 +11,15 @@ import pytest
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "app"))
 
-from yds_reader import YDSReader
+from yds_reader import YDSReader, celsius_to_fahrenheit
+
+
+def test_celsius_to_fahrenheit():
+    """Verify Celsius to Fahrenheit conversion function."""
+    assert celsius_to_fahrenheit(0.0) == 32.0
+    assert celsius_to_fahrenheit(100.0) == 212.0
+    assert celsius_to_fahrenheit(25.3) == 77.5
+    assert celsius_to_fahrenheit(-40.0) == -40.0
 
 
 def test_engine_temp_cold():
