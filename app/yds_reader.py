@@ -17,7 +17,6 @@ YDS Screen Calibrated Opcode Mapping (ECU 63P-8591A-01):
 """
 
 import os
-import sys
 import time
 import json
 import math
