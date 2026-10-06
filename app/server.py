@@ -16,6 +16,7 @@ import subprocess
 from typing import Set
 from contextlib import asynccontextmanager
 
+import aiofiles
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -334,8 +335,9 @@ async def serve_index():
     """Serves the main dashboard user interface."""
     index_file = os.path.join(static_dir, "index.html")
     if os.path.exists(index_file):
-        with open(index_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
+        async with aiofiles.open(index_file, "r", encoding="utf-8") as f:
+            content = await f.read()
+            return HTMLResponse(content=content)
     return HTMLResponse(content="<h2>YDS Dashboard static files not found. Please build static/index.html</h2>")
 
 
