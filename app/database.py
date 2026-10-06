@@ -9,6 +9,7 @@ import os
 import sqlite3
 import json
 import time
+import math
 import logging
 from typing import Dict, Any, List, Optional
 
@@ -175,8 +176,17 @@ def update_fuel_state(current_liters: float, trip_consumed: Optional[float] = No
 
 def adjust_fuel_level(delta_liters: float) -> Dict[str, Any]:
     """Adjusts current fuel level by delta (+/- liters) in SQLite."""
+    try:
+        delta = float(delta_liters)
+        if math.isnan(delta) or math.isinf(delta):
+            logger.warning("Invalid delta_liters provided (NaN or Inf), defaulting to 0.0")
+            delta = 0.0
+    except (ValueError, TypeError):
+        logger.warning("Non-numeric delta_liters provided, defaulting to 0.0")
+        delta = 0.0
+
     current_state = get_fuel_state()
-    new_level = current_state["current_fuel_liters"] + delta_liters
+    new_level = current_state["current_fuel_liters"] + delta
     return update_fuel_state(new_level)
 
 
