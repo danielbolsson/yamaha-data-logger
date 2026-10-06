@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import json
+import math
 import asyncio
 import logging
 import argparse
@@ -242,7 +243,17 @@ async def get_fuel_endpoint():
 async def adjust_fuel_endpoint(payload: dict):
     """Adjusts current fuel level by delta liters (+1, -1, +20, -20) in SQLite."""
     global current_fuel_state
-    delta = float(payload.get("delta", 0.0))
+    if not isinstance(payload, dict):
+        return JSONResponse({"error": "Invalid JSON payload"}, status_code=400)
+
+    raw_delta = payload.get("delta", 0.0)
+    try:
+        delta = float(raw_delta)
+        if math.isnan(delta) or math.isinf(delta):
+            return JSONResponse({"error": "Delta must be a finite number"}, status_code=400)
+    except (ValueError, TypeError):
+        return JSONResponse({"error": "Invalid delta parameter, must be numeric"}, status_code=400)
+
     current_fuel_state = database.adjust_fuel_level(delta)
     logger.info(f"Adjusted fuel level by {delta}L -> New Level: {current_fuel_state['current_fuel_liters']}L")
     return JSONResponse(current_fuel_state)
