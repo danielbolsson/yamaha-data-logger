@@ -17,7 +17,6 @@ YDS Screen Calibrated Opcode Mapping (ECU 63P-8591A-01):
 """
 
 import os
-import sys
 import time
 import json
 import math
@@ -32,6 +31,11 @@ except ImportError:
 
 logger = logging.getLogger("yds_reader")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+
+def celsius_to_fahrenheit(celsius: float) -> float:
+    """Converts a temperature from Celsius to Fahrenheit, rounded to 1 decimal place."""
+    return round((celsius * 9.0 / 5.0) + 32.0, 1)
 
 
 class YDSReader:
@@ -420,7 +424,7 @@ class YDSReader:
         # 11. Intake Air Temperature (Opcode 0xEF / 0x1B)
         raw_intake_temp = int_raw.get(0xEF) or int_raw.get(0x1B)
         intake_temp_c = round((float(raw_intake_temp) * 0.5) - 0.2, 1) if (raw_intake_temp is not None and raw_intake_temp > 0) else 25.3
-        intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
+        intake_temp_f = celsius_to_fahrenheit(intake_temp_c)
 
         # 12. Warnings & Switch Status
         low_oil_alarm = bool(rpm > 300.0 and oil_pressure_kpa < 100.0)
@@ -501,9 +505,9 @@ class YDSReader:
 
         # Engine and Intake Air Temperatures
         engine_temp_c = round(43.0 + max(0.0, min(1.0, (rpm - 650.0) / 2800.0)) * 3.5 + (math.sin(t * 0.05) * 0.3), 1)
-        engine_temp_f = round((engine_temp_c * 9.0 / 5.0) + 32.0, 1)
+        engine_temp_f = celsius_to_fahrenheit(engine_temp_c)
         intake_temp_c = round(25.3 + max(0.0, min(1.0, (rpm - 650.0) / 2800.0)) * 2.6, 1)
-        intake_temp_f = round((intake_temp_c * 9.0 / 5.0) + 32.0, 1)
+        intake_temp_f = celsius_to_fahrenheit(intake_temp_c)
 
         # Intake MAP Pressure (51.2 kPa @ idle -> 93.1 kPa @ cruise) & Baro
         map_kpa = round(51.21 + max(0.0, min(1.0, (rpm - 650.0) / 2800.0)) * 41.89 + (random.random() - 0.5) * 0.6, 2)

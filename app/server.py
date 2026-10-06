@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import json
+import math
 import asyncio
 import logging
 import argparse
@@ -16,6 +17,7 @@ import subprocess
 from typing import Set
 from contextlib import asynccontextmanager
 
+import aiofiles
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -34,6 +36,7 @@ logger = logging.getLogger("yds_server")
 # Global State
 active_websockets: Set[WebSocket] = set()
 latest_telemetry: dict = {}
+latest_telemetry_json: str = "{}"
 yds_reader_instance: YDSReader = None
 gps_reader_instance: GPSReader = None
 polling_task: asyncio.Task = None
@@ -69,7 +72,7 @@ async def telemetry_background_loop():
     Asynchronous background loop polling ECU telemetry at 5 Hz (every 200ms),
     calculating fuel consumption, logging frames to SQLite, and broadcasting updates.
     """
-    global latest_telemetry, active_websockets, yds_reader_instance, current_fuel_state, last_polling_time, last_db_log_time
+    global latest_telemetry, latest_telemetry_json, active_websockets, yds_reader_instance, current_fuel_state, last_polling_time, last_db_log_time
     logger.info("Starting background YDS polling loop (5 Hz)...")
 
     # Connect to serial port / init reader
@@ -127,6 +130,7 @@ async def telemetry_background_loop():
             })
 
             latest_telemetry = data
+            latest_telemetry_json = json.dumps(data)
 
             # Log to SQLite database history every 1.0 second (live hardware mode only, skip for mock or replay)
             if not is_simulation_or_replay and (now - last_db_log_time) >= 1.0:
@@ -135,12 +139,11 @@ async def telemetry_background_loop():
 
             # Broadcast to active WebSocket connections
             if active_websockets:
-                payload = json.dumps(data)
                 disconnected_clients = set()
 
                 for ws in list(active_websockets):
                     try:
-                        await ws.send_text(payload)
+                        await ws.send_text(latest_telemetry_json)
                     except Exception as ws_err:
                         logger.debug(f"Client disconnected or send failed: {ws_err}")
                         disconnected_clients.add(ws)
@@ -241,7 +244,17 @@ async def get_fuel_endpoint():
 async def adjust_fuel_endpoint(payload: dict):
     """Adjusts current fuel level by delta liters (+1, -1, +20, -20) in SQLite."""
     global current_fuel_state
-    delta = float(payload.get("delta", 0.0))
+    if not isinstance(payload, dict):
+        return JSONResponse({"error": "Invalid JSON payload"}, status_code=400)
+
+    raw_delta = payload.get("delta", 0.0)
+    try:
+        delta = float(raw_delta)
+        if math.isnan(delta) or math.isinf(delta):
+            return JSONResponse({"error": "Delta must be a finite number"}, status_code=400)
+    except (ValueError, TypeError):
+        return JSONResponse({"error": "Invalid delta parameter, must be numeric"}, status_code=400)
+
     current_fuel_state = database.adjust_fuel_level(delta)
     logger.info(f"Adjusted fuel level by {delta}L -> New Level: {current_fuel_state['current_fuel_liters']}L")
     return JSONResponse(current_fuel_state)
@@ -297,9 +310,9 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
     logger.info(f"WebSocket client connected from {websocket.client.host}. Total clients: {len(active_websockets)}")
 
     # Send initial telemetry snapshot immediately
-    if latest_telemetry:
+    if latest_telemetry_json and latest_telemetry_json != "{}":
         try:
-            await websocket.send_text(json.dumps(latest_telemetry))
+            await websocket.send_text(latest_telemetry_json)
         except Exception:
             pass
 
@@ -334,8 +347,9 @@ async def serve_index():
     """Serves the main dashboard user interface."""
     index_file = os.path.join(static_dir, "index.html")
     if os.path.exists(index_file):
-        with open(index_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
+        async with aiofiles.open(index_file, "r", encoding="utf-8") as f:
+            content = await f.read()
+            return HTMLResponse(content=content)
     return HTMLResponse(content="<h2>YDS Dashboard static files not found. Please build static/index.html</h2>")
 
 
