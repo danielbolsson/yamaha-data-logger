@@ -137,20 +137,24 @@ async def telemetry_background_loop():
                 last_db_log_time = now
                 await loop.run_in_executor(None, database.log_telemetry_frame, data)
 
-            # Broadcast to active WebSocket connections
+            # Broadcast to active WebSocket connections concurrently
             if active_websockets:
-                disconnected_clients = set()
+                clients = list(active_websockets)
 
-                for ws in list(active_websockets):
+                async def send_to_client(ws: WebSocket):
                     try:
                         await ws.send_text(latest_telemetry_json)
+                        return None
                     except Exception as ws_err:
                         logger.debug(f"Client disconnected or send failed: {ws_err}")
-                        disconnected_clients.add(ws)
+                        return ws
+
+                results = await asyncio.gather(*[send_to_client(ws) for ws in clients], return_exceptions=True)
 
                 # Clean up dropped connections
-                for dead_ws in disconnected_clients:
-                    active_websockets.discard(dead_ws)
+                for res in results:
+                    if res and not isinstance(res, Exception):
+                        active_websockets.discard(res)
 
             await asyncio.sleep(0.2)  # 5 Hz polling interval
 
