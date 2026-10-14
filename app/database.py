@@ -279,11 +279,18 @@ def get_history(limit: int = 100) -> List[Dict[str, Any]]:
                        fuel_rate_lh, injector_ms, warnings_json,
                        gps_speed_kts, gps_heading_deg, gps_cardinal, gps_satellites,
                        gps_has_fix, gps_latitude, gps_longitude, fuel_economy_l_nm
-                FROM telemetry_history
-                ORDER BY id DESC LIMIT ?;
+                FROM (
+                    SELECT id, timestamp, rpm, engine_hours, tps_percent, map_kpa, baro_hpa,
+                           engine_temp_c, intake_temp_c, oil_pressure_kpa, battery_voltage,
+                           fuel_rate_lh, injector_ms, warnings_json,
+                           gps_speed_kts, gps_heading_deg, gps_cardinal, gps_satellites,
+                           gps_has_fix, gps_latitude, gps_longitude, fuel_economy_l_nm
+                    FROM telemetry_history
+                    ORDER BY id DESC LIMIT ?
+                ) ORDER BY id ASC;
             """, (limit,))
             rows = cursor.fetchall()
-            for r in reversed(rows):
+            for r in rows:
                 rec = dict(r)
                 if rec.get("warnings_json"):
                     try:
