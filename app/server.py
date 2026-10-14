@@ -236,7 +236,7 @@ async def get_system_status():
 async def get_fuel_endpoint():
     """Returns current fuel tank level and trip consumption from SQLite."""
     global current_fuel_state
-    current_fuel_state = database.get_fuel_state()
+    current_fuel_state = await asyncio.to_thread(database.get_fuel_state)
     return JSONResponse(current_fuel_state)
 
 
@@ -255,7 +255,7 @@ async def adjust_fuel_endpoint(payload: dict):
     except (ValueError, TypeError):
         return JSONResponse({"error": "Invalid delta parameter, must be numeric"}, status_code=400)
 
-    current_fuel_state = database.adjust_fuel_level(delta)
+    current_fuel_state = await asyncio.to_thread(database.adjust_fuel_level, delta)
     logger.info(f"Adjusted fuel level by {delta}L -> New Level: {current_fuel_state['current_fuel_liters']}L")
     return JSONResponse(current_fuel_state)
 
@@ -264,7 +264,7 @@ async def adjust_fuel_endpoint(payload: dict):
 async def fill_fuel_endpoint():
     """Resets fuel tank level to 170.0L full capacity in SQLite."""
     global current_fuel_state
-    current_fuel_state = database.fill_tank_full(170.0)
+    current_fuel_state = await asyncio.to_thread(database.fill_tank_full, 170.0)
     logger.info(f"Filled fuel tank to FULL (170.0L)")
     return JSONResponse(current_fuel_state)
 
@@ -273,7 +273,7 @@ async def fill_fuel_endpoint():
 async def reset_trip_endpoint():
     """Resets trip consumed fuel counter to 0.0 in SQLite."""
     global current_fuel_state
-    current_fuel_state = database.reset_trip_consumed()
+    current_fuel_state = await asyncio.to_thread(database.reset_trip_consumed)
     logger.info("Reset trip fuel consumption counter")
     return JSONResponse(current_fuel_state)
 
@@ -281,7 +281,7 @@ async def reset_trip_endpoint():
 @app.get("/api/history")
 async def get_history_endpoint(limit: int = 100):
     """Retrieves recent telemetry history frames from SQLite."""
-    history = database.get_history(limit=limit)
+    history = await asyncio.to_thread(database.get_history, limit=limit)
     return JSONResponse({"count": len(history), "history": history})
 
 
