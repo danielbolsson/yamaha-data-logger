@@ -281,7 +281,8 @@ async def reset_trip_endpoint():
 @app.get("/api/history")
 async def get_history_endpoint(limit: int = 100):
     """Retrieves recent telemetry history frames from SQLite."""
-    history = database.get_history(limit=limit)
+    loop = asyncio.get_running_loop()
+    history = await loop.run_in_executor(None, database.get_history, limit)
     return JSONResponse({"count": len(history), "history": history})
 
 
