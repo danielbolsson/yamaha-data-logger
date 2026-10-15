@@ -112,10 +112,10 @@ def init_db():
     logger.info("SQLite database initialization complete.")
 
 
-def get_fuel_state() -> Dict[str, Any]:
+def get_fuel_state(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
     """Retrieves current fuel tank state and trip consumption from SQLite."""
     try:
-        with get_db_connection() as conn:
+        if conn is not None:
             cursor = conn.cursor()
             cursor.execute("SELECT current_fuel_liters, tank_capacity_liters, trip_consumed_liters, updated_at FROM fuel_state WHERE id = 1;")
             row = cursor.fetchone()
@@ -131,6 +131,9 @@ def get_fuel_state() -> Dict[str, Any]:
                     "fuel_percent": pct,
                     "updated_at": row["updated_at"]
                 }
+        else:
+            with get_db_connection() as c:
+                return get_fuel_state(conn=c)
     except Exception as e:
         logger.error(f"Error reading fuel state from SQLite: {e}")
 
@@ -143,12 +146,12 @@ def get_fuel_state() -> Dict[str, Any]:
     }
 
 
-def update_fuel_state(current_liters: float, trip_consumed: Optional[float] = None, capacity: Optional[float] = None) -> Dict[str, Any]:
+def update_fuel_state(current_liters: float, trip_consumed: Optional[float] = None, capacity: Optional[float] = None, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
     """Updates fuel level and trip consumption in SQLite."""
     try:
-        with get_db_connection() as conn:
+        if conn is not None:
             cursor = conn.cursor()
-            cur_state = get_fuel_state()
+            cur_state = get_fuel_state(conn=conn)
             new_rem = round(max(0.0, min(capacity or cur_state["tank_capacity_liters"], current_liters)), 2)
             new_cap = round(capacity or cur_state["tank_capacity_liters"], 1)
             new_trip = round(trip_consumed if trip_consumed is not None else cur_state["trip_consumed_liters"], 2)
@@ -169,12 +172,15 @@ def update_fuel_state(current_liters: float, trip_consumed: Optional[float] = No
                 "fuel_percent": pct,
                 "updated_at": now
             }
+        else:
+            with get_db_connection() as c:
+                return update_fuel_state(current_liters, trip_consumed=trip_consumed, capacity=capacity, conn=c)
     except Exception as e:
         logger.error(f"Error updating fuel state in SQLite: {e}")
-        return get_fuel_state()
+        return get_fuel_state(conn=conn)
 
 
-def adjust_fuel_level(delta_liters: float) -> Dict[str, Any]:
+def adjust_fuel_level(delta_liters: float, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
     """Adjusts current fuel level by delta (+/- liters) in SQLite."""
     try:
         delta = float(delta_liters)
@@ -185,20 +191,36 @@ def adjust_fuel_level(delta_liters: float) -> Dict[str, Any]:
         logger.warning("Non-numeric delta_liters provided, defaulting to 0.0")
         delta = 0.0
 
-    current_state = get_fuel_state()
-    new_level = current_state["current_fuel_liters"] + delta
-    return update_fuel_state(new_level)
+    try:
+        if conn is not None:
+            current_state = get_fuel_state(conn=conn)
+            new_level = current_state["current_fuel_liters"] + delta
+            return update_fuel_state(new_level, conn=conn)
+        else:
+            with get_db_connection() as c:
+                return adjust_fuel_level(delta_liters, conn=c)
+    except Exception as e:
+        logger.error(f"Error adjusting fuel level in SQLite: {e}")
+        return get_fuel_state()
 
 
-def fill_tank_full(capacity: float = 170.0) -> Dict[str, Any]:
+def fill_tank_full(capacity: float = 170.0, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
     """Fills fuel tank to full capacity in SQLite."""
-    return update_fuel_state(capacity, capacity=capacity)
+    return update_fuel_state(capacity, capacity=capacity, conn=conn)
 
 
-def reset_trip_consumed() -> Dict[str, Any]:
+def reset_trip_consumed(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
     """Resets trip consumed fuel counter to 0.0 in SQLite."""
-    current_state = get_fuel_state()
-    return update_fuel_state(current_state["current_fuel_liters"], trip_consumed=0.0, capacity=current_state["tank_capacity_liters"])
+    try:
+        if conn is not None:
+            current_state = get_fuel_state(conn=conn)
+            return update_fuel_state(current_state["current_fuel_liters"], trip_consumed=0.0, capacity=current_state["tank_capacity_liters"], conn=conn)
+        else:
+            with get_db_connection() as c:
+                return reset_trip_consumed(conn=c)
+    except Exception as e:
+        logger.error(f"Error resetting trip consumed in SQLite: {e}")
+        return get_fuel_state()
 
 
 def log_telemetry_frame(data: Dict[str, Any]):
@@ -257,11 +279,18 @@ def get_history(limit: int = 100) -> List[Dict[str, Any]]:
                        fuel_rate_lh, injector_ms, warnings_json,
                        gps_speed_kts, gps_heading_deg, gps_cardinal, gps_satellites,
                        gps_has_fix, gps_latitude, gps_longitude, fuel_economy_l_nm
-                FROM telemetry_history
-                ORDER BY id DESC LIMIT ?;
+                FROM (
+                    SELECT id, timestamp, rpm, engine_hours, tps_percent, map_kpa, baro_hpa,
+                           engine_temp_c, intake_temp_c, oil_pressure_kpa, battery_voltage,
+                           fuel_rate_lh, injector_ms, warnings_json,
+                           gps_speed_kts, gps_heading_deg, gps_cardinal, gps_satellites,
+                           gps_has_fix, gps_latitude, gps_longitude, fuel_economy_l_nm
+                    FROM telemetry_history
+                    ORDER BY id DESC LIMIT ?
+                ) ORDER BY id ASC;
             """, (limit,))
             rows = cursor.fetchall()
-            for r in reversed(rows):
+            for r in rows:
                 rec = dict(r)
                 if rec.get("warnings_json"):
                     try:
